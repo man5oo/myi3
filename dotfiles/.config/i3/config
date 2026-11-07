@@ -9,7 +9,6 @@ set $EDITOR geany
 set $SYSTEM_MONITOR htop
 
 exec --no-startup-id xrandr --output eDP-1 --mode 1920x1080 --rate 60
-exec --no-startup-id dex --autostart --environment i3
 exec --no-startup-id xdg-user-dirs-update
 exec --no-startup-id picom
 exec --no-startup-id xss-lock --transfer-sleep-lock -- $CONFIG/i3/scripts/i3lock
@@ -20,8 +19,8 @@ exec --no-startup-id dunst
 exec --no-startup-id xinput disable "ELAN Touchscreen"
 exec --no-startup-id thunar --daemon
 exec --no-startup-id greenclip daemon
-exec --no-startup-id batsignal
 exec --no-startup-id /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
+exec --no-startup-id /usr/lib/xapps/xapp-sn-watcher
 
 set $bg          #1B1C1E
 set $bg-t		 #1B1C1Eff

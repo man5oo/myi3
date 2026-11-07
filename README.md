@@ -21,4 +21,4 @@ My personal i3wm configuration for my laptop.
 
 ## Notes
 
-See asstes/Instructions.md
+See assets/Instructions.md
