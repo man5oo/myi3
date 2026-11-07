@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+
+# myi3 di manuel - v1.0
+
+set -u
+
+SCRIPT="$HOME/.config/i3/scripts/autorotate"
+STATE_DIR="$HOME/.local/state/autorotate"
+PIDFILE="$STATE_DIR/autorotate.pid"
+LOGFILE="$STATE_DIR/autorotate.log"
+
+mkdir -p "$STATE_DIR" || exit 1
+
+is_running() {
+    [[ -f "$PIDFILE" ]] || return 1
+
+    local pid
+    read -r pid < "$PIDFILE" || return 1
+
+    [[ "$pid" =~ ^[0-9]+$ ]] &&
+        kill -0 "$pid" 2>/dev/null
+}
+
+enable_rotation() {
+    if is_running; then
+        echo "Autorotation already enabled."
+        return 0
+    fi
+
+    rm -f "$PIDFILE"
+
+    [[ -x "$SCRIPT" ]] || {
+        echo "Error: script missing or not executable: $SCRIPT" >&2
+        return 1
+    }
+
+    nohup "$SCRIPT" >>"$LOGFILE" 2>&1 </dev/null &
+    local pid=$!
+
+    echo "$pid" > "$PIDFILE"
+
+    sleep 0.5
+
+    if kill -0 "$pid" 2>/dev/null; then
+        echo "Autorotation enabled (PID $pid)."
+    else
+        rm -f "$PIDFILE"
+        echo "Failed to start. See $LOGFILE" >&2
+        return 1
+    fi
+}
+
+disable_rotation() {
+    if ! is_running; then
+        rm -f "$PIDFILE"
+        echo "Autorotation already disabled."
+        return 0
+    fi
+
+    local pid
+    read -r pid < "$PIDFILE"
+
+    kill -TERM "$pid" 2>/dev/null || true
+
+    for _ in {1..30}; do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 0.1
+    done
+
+    if kill -0 "$pid" 2>/dev/null; then
+        echo "Error: process did not stop cleanly." >&2
+        echo "Check $LOGFILE before forcing termination." >&2
+        return 1
+    fi
+
+    rm -f "$PIDFILE"
+    echo "Autorotation disabled."
+}
+
+case "${1:-toggle}" in
+    enable)
+        enable_rotation
+        ;;
+    disable)
+        disable_rotation
+        ;;
+    toggle)
+        if is_running; then
+            disable_rotation
+        else
+            enable_rotation
+        fi
+        ;;
+    *)
+        echo "Usage: $0 {enable|disable|toggle}" >&2
+        exit 2
+        ;;
+esac

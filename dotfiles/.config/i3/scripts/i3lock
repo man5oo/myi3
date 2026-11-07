@@ -1,0 +1,46 @@
+#!/bin/sh
+
+# myi3 di manuel - v1.0
+
+BLANK='#00000000'
+CLEAR='#ffffff22'
+DEFAULT='#9AA0A6'
+TEXT='#8AB4F8'
+WRONG='#F28B82'
+VERIFYING='#8AB4F8'
+
+i3lock \
+--nofork \
+--insidever-color=$CLEAR     \
+--ringver-color=$VERIFYING   \
+\
+--pass-volume-keys \
+--pass-screen-keys \
+--pass-media-keys \
+\
+--insidewrong-color=$CLEAR   \
+--ringwrong-color=$WRONG     \
+\
+--inside-color=$BLANK        \
+--ring-color=$DEFAULT        \
+--line-color=$BLANK          \
+--separator-color=$DEFAULT   \
+--ring-width=3.0	     \
+--radius=160		     \
+\
+--verif-color=$TEXT          \
+--verif-text="Verifyng.." \
+--wrong-color=$WRONG          \
+--wrong-text="Wrong" \
+--time-color=$TEXT           \
+--date-color=$TEXT           \
+--layout-color=$TEXT         \
+--keyhl-color=$WRONG         \
+--bshl-color=$WRONG          \
+\
+--blur 8                     \
+--clock                      \
+--indicator                  \
+--time-str="%H:%M"        \
+--time-size=56		\
+--date-str="%A, %b %d"       

@@ -1,0 +1,200 @@
+# i3 - Manuel - v3.0
+
+set $mod Mod4
+set $CONFIG $HOME/.config
+set $TERMINAL alacritty
+set $BROWSER firefox
+set $FILEM Thunar
+set $EDITOR geany
+set $SYSTEM_MONITOR htop
+
+exec --no-startup-id xrandr --output eDP-1 --mode 1920x1080 --rate 60
+exec --no-startup-id dex --autostart --environment i3
+exec --no-startup-id xdg-user-dirs-update
+exec --no-startup-id picom
+exec --no-startup-id xss-lock --transfer-sleep-lock -- $CONFIG/i3/scripts/i3lock
+exec --no-startup-id nm-applet
+exec --no-startup-id blueman-applet
+exec --no-startup-id $CONFIG/i3/scripts/set-wallpaper
+exec --no-startup-id dunst
+exec --no-startup-id xinput disable "ELAN Touchscreen"
+exec --no-startup-id thunar --daemon
+exec --no-startup-id greenclip daemon
+exec --no-startup-id batsignal
+exec --no-startup-id /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
+
+set $bg          #1B1C1E
+set $bg-t		 #1B1C1Eff
+set $surface     #232427
+set $elevated    #2A2B2E
+set $border	     #2a2b2e
+set $fg          #E8EAED
+set $fg-dim      #9AA0A6
+set $accent      #8AB4F8
+set $danger      #F28B82
+set $warning     #FDD663
+set $success     #81C995
+
+# class                   border   backgr.   text   indic.     child_border
+client.focused            $border  $surface  $fg     $accent  $border
+client.focused_inactive   $border  $surface  $fg-dim $border  $border
+client.unfocused          $bg      $bg       $fg-dim $border  $bg
+client.urgent             $danger  $bg       $danger $danger  $danger
+
+font pango:Roboto, JetBrainsMono Nerd Font 11
+default_border pixel 1
+default_floating_border normal
+title_align left
+
+floating_modifier $mod
+
+bindsym XF86AudioRaiseVolume  exec --no-startup-id wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+ && $CONFIG/dunst/volume-notify
+bindsym XF86AudioLowerVolume  exec --no-startup-id wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- && $CONFIG/dunst/volume-notify
+bindsym XF86AudioMute         exec --no-startup-id wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle && $CONFIG/dunst/volume-notify
+bindsym XF86AudioPlay         exec --no-startup-id playerctl play-pause
+bindsym XF86AudioNext         exec --no-startup-id playerctl next
+bindsym XF86AudioPrev         exec --no-startup-id playerctl previous
+bindsym XF86MonBrightnessUp   exec --no-startup-id brightnessctl set +10% && $CONFIG/dunst/brightness-notify
+bindsym XF86MonBrightnessDown exec --no-startup-id brightnessctl set 10%- && $CONFIG/dunst/brightness-notify
+
+bindsym $mod+a floating toggle
+bindsym $mod+b exec --no-startup-id blueman-manager
+bindsym $mod+c exec --no-startup-id sh $CONFIG/i3/scripts/rofi-greenclip
+bindsym $mod+d layout tabbed
+bindsym $mod+e layout toggle split
+bindsym $mod+f fullscreen toggle
+bindsym $mod+h split h
+bindsym $mod+i exec sh $CONFIG/i3/scripts/launcher
+bindsym $mod+l exec sh $CONFIG/i3/scripts/i3lock
+bindsym $mod+m exec --no-startup-id wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle && $CONFIG/dunst/mic-notify
+bindsym $mod+p focus parent
+bindsym $mod+q kill
+bindsym $mod+r mode "resize"
+bindsym $mod+s sticky toggle
+bindsym $mod+t exec --no-startup-id sh $CONFIG/i3/scripts/touch-toggle
+bindsym $mod+v split v
+bindsym $mod+w exec --no-startup-id sh $CONFIG/i3/scripts/rofi-wall
+bindsym $mod+y exec --no-startup-id sh $CONFIG/i3/scripts/autorotate-toggle toggle && $CONFIG/dunst/autorotate-notify
+bindsym $mod+z exec --no-startup-id $TERMINAL -t htop -e htop
+
+bindsym $mod+Tab workspace next
+bindsym --release Print exec --no-startup-id $CONFIG/i3/scripts/screenshot
+bindsym $mod+Return exec $TERMINAL
+bindsym $mod+Left focus left
+bindsym $mod+Down focus down
+bindsym $mod+Up focus up
+bindsym $mod+Right focus right
+bindsym $mod+space exec $CONFIG/i3/scripts/app-launcher
+bindsym $mod+Escape exec --no-startup-id $CONFIG/i3/scripts/power-menu
+
+bindsym $mod+plus move scratchpad
+bindsym $mod+minus scratchpad show
+
+bindsym $mod+Shift+c reload
+bindsym $mod+Shift+r restart
+
+bindsym Mod1+Tab exec rofi -show window -config $CONFIG/rofi/window-switcher-menu.rasi
+bindsym $mod+Shift+Left move left
+bindsym $mod+Shift+Down move down
+bindsym $mod+Shift+Up move up
+bindsym $mod+Shift+Right move right
+
+set $ws1 "1"
+set $ws2 "2"
+set $ws3 "3"
+set $ws4 "4"
+set $ws5 "5"
+set $ws6 "6"
+set $ws7 "7"
+set $ws8 "8"
+set $ws9 "9"
+
+assign [class="$BROWSER"] $ws8
+assign [title="$SYSTEM_MONITOR"] $ws9
+
+for_window [urgent=latest] focus
+for_window [class="Blueman-manager"] floating enable
+for_window [class="Nm-connection-editor"] floating enable
+for_window [class="Alacritty"] floating enable, resize set 800 600, move position center
+for_window [class="feh"] floating enable, resize set 1600 1000, move position center
+
+bindsym $mod+1 workspace $ws1
+bindsym $mod+2 workspace $ws2
+bindsym $mod+3 workspace $ws3
+bindsym $mod+4 workspace $ws4
+bindsym $mod+5 workspace $ws5
+bindsym $mod+6 workspace $ws6
+bindsym $mod+7 workspace $ws7
+bindsym $mod+8 workspace $ws8
+bindsym $mod+9 workspace $ws9
+bindsym $mod+Shift+1 move container to workspace $ws1
+bindsym $mod+Shift+2 move container to workspace $ws2
+bindsym $mod+Shift+3 move container to workspace $ws3
+bindsym $mod+Shift+4 move container to workspace $ws4
+bindsym $mod+Shift+5 move container to workspace $ws5
+bindsym $mod+Shift+6 move container to workspace $ws6
+bindsym $mod+Shift+7 move container to workspace $ws7
+bindsym $mod+Shift+8 move container to workspace $ws8
+bindsym $mod+Shift+9 move container to workspace $ws9
+
+mode "resize" {
+    bindsym Left resize shrink width 10 px or 10 ppt
+    bindsym Down resize grow height 10 px or 10 ppt
+    bindsym Up resize shrink height 10 px or 10 ppt
+    bindsym Right resize grow width 10 px or 10 ppt
+    bindsym Return mode "default"
+    bindsym Escape mode "default"
+    bindsym $mod+r mode "default"
+}
+
+bar {
+    status_command i3blocks -c $HOME/.config/i3/i3blocks.conf
+    font pango:Roboto, JetBrainsMono Nerd Font 11
+    tray_output primary
+    position top
+    mode dock
+    separator_symbol " "
+    colors {
+        background $bg
+        focused_workspace   $bg      $elevated  $fg
+        inactive_workspace  $bg-t      $bg        $fg-dim
+        urgent_workspace    $danger  $danger    $fg
+    }
+}
+
+gaps inner 14
+gaps outer -2
+smart_gaps off
+smart_borders on
+
+set $mode_gaps Gaps: (o) outer, (i) inner
+set $mode_gaps_outer Outer Gaps: +|-|0 (local), Shift + +|-|0 (global)
+set $mode_gaps_inner Inner Gaps: +|-|0 (local), Shift + +|-|0 (global)
+bindsym $mod+Shift+g mode "$mode_gaps"
+
+mode "$mode_gaps" {
+    bindsym o mode "$mode_gaps_outer"
+    bindsym i mode "$mode_gaps_inner"
+    bindsym Return mode "default"
+    bindsym Escape mode "default"
+}
+mode "$mode_gaps_outer" {
+    bindsym plus gaps outer current plus 5
+    bindsym minus gaps outer current minus 5
+    bindsym 0 gaps outer current set 0
+    bindsym Shift+plus gaps outer all plus 5
+    bindsym Shift+minus gaps outer all minus 5
+    bindsym Shift+0 gaps outer all set 0
+    bindsym Return mode "default"
+    bindsym Escape mode "default"
+}
+mode "$mode_gaps_inner" {
+    bindsym plus gaps inner current plus 5
+    bindsym minus gaps inner current minus 5
+    bindsym 0 gaps inner current set 0
+    bindsym Shift+plus gaps inner all plus 5
+    bindsym Shift+minus gaps inner all minus 5
+    bindsym Shift+0 gaps inner all set 0
+    bindsym Return mode "default"
+    bindsym Escape mode "default"
+}

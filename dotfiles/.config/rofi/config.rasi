@@ -1,0 +1,155 @@
+/* ============================================================
+ * myi3 di manuel - v1.0
+ * ============================================================ */
+
+@import "~/.config/rofi/colors.rasi"
+
+configuration {
+    font:            "Roboto 14";
+    show-icons:      false;
+    icon-theme:      "Papirus";
+    scroll-method:   0;
+    disable-history: false;
+    hover-select:    true;
+    me-select-entry: "MousePrimary";
+    me-accept-entry: "!MousePrimary";
+    disable-history: true;
+}
+
+window {
+    border:           2px;
+    width: 800px;
+    border-radius:    0px;
+    padding:          10px;
+    transparency:     "real";
+    location:         center;
+    x-offset:         0;
+    y-offset:         0;
+    background-color: @background;
+    border-color: @dark3;
+}
+
+mainbox {
+    children: [ inputbar, listview ];
+    spacing:  10px;
+}
+
+inputbar {
+    background-color: @charcoal;
+    border:           2px;
+    border-color:     @dark3;
+    border-radius:    0px;
+    padding:          8px 14px;
+    spacing:          8px;
+    children:         [ entry ];
+}
+
+prompt {
+    background-color: @charcoal;
+    text-color:       @gray2;
+}
+
+entry {
+    background-color:  @charcoal;
+    text-color:        @fg;
+    placeholder-color: @gray2;
+}
+
+message {
+    background-color: @background;
+    border: 0px 0px 1px 0px;
+    border-color: @lightblue;
+    padding: 4px 8px 10px 8px;
+}
+
+textbox {
+    background-color: @background;
+    text-color: @gray2;
+}
+
+listview {
+    scrollbar: true;
+    margin:    2px;
+    horizontal-align: 0.5;
+    vertical-align: 0.5;
+    fixed-height:  true;
+    fixed-columns: true;
+}
+
+scrollbar {
+    width:        4px;
+    border:       0;
+    handle-color: @charcoal;
+    handle-width: 8px;
+    padding:      0;
+}
+
+element {
+    border:        0;
+    border-radius: 0px;
+    padding: 8px 12px;
+    vertical-allign: 0.5;
+    horizontal-align: 0.5;
+}
+
+element-text {
+    background-color: inherit;
+    text-color:       inherit;
+}
+
+/* NORMAL */
+element.normal.normal {
+    background-color: @background;
+    text-color:       @fg;
+}
+element.normal.active {
+    background-color: @background;
+    text-color:       @lightblue;
+}
+element.normal.urgent {
+    background-color: @background;
+    text-color:       @red;
+}
+
+/* ALTERNATE */
+element.alternate.normal {
+    background-color: @background;
+    text-color:       @fg;
+}
+element.alternate.active {
+    background-color: @background;
+    text-color:       @lightblue;
+}
+element.alternate.urgent {
+    background-color: @background;
+    text-color:       @red;
+}
+
+/* SELECTED */
+element.selected.normal {
+    background-color: @charcoal;
+    text-color:       @lightblue;
+}
+element.selected.active {
+    background-color: @charcoal;
+    text-color:       @lightblue;
+}
+element.selected.urgent {
+    background-color: @red;
+    text-color:       @bg;
+}
+
+button {
+    spacing:    0;
+    background-color: @bg;
+    text-color:       @gray2;
+}
+button.selected {
+    background-color: @selected-normal-background;
+    text-color:       @selected-normal-foreground;
+}
+
+case-indicator {
+    spacing:    0;
+    text-color: @normal-foreground;
+}

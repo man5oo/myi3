@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# myi3 di manuel - v1.0
+
+state="${XDG_STATE_HOME:-$HOME/.local/state}/i3/wallpaper"
+default="$HOME/Pictures/Wallpapers/wall-3.png"
+
+if [ -n "$1" ]; then
+    wall=$1
+elif [ -r "$state" ]; then
+    wall=$(cat "$state")
+fi
+
+[ -f "$wall" ] || wall=$default
+exec feh --bg-fill "$wall"

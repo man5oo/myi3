@@ -1,0 +1,48 @@
+/* ============================================================
+ * myi3 di manuel - v1.0
+ * ============================================================ */
+ 
+@import "config.rasi"
+
+configuration {
+    show-icons:    true;
+    scroll-method: 1;
+    hover-select:  false;
+    disable-history: false;
+}
+
+window {
+    width: 400px;
+}
+
+inputbar {
+	enabled: false;
+}
+
+listview {
+    flow:          horizontal;
+    layout:        horizontal;
+    fixed-columns: false;
+    cycle:         true;
+    dynamic:       true;
+    scrollbar:     false;
+    border:        0px;
+}
+
+element {
+    layout:  horizontal;
+    padding: 0px;
+    width:   80px;
+}
+
+element-text {
+    enabled: false;
+}
+
+element-icon {
+    size:             3.0em;
+    margin:           5px;
+    padding:          0px;
+    vertical-align:   0.5;
+    horizontal-align: 0.5;
+}

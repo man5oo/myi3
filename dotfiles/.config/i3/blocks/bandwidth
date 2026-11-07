@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+
+# myi3 di manuel - v1.0
+
+while [[ $# -gt 1 ]]; do
+    key="$1"
+    case "$key" in
+        -i|--inlabel)
+            INLABEL="$2"
+            shift;;
+        -o|--outlabel)
+            OUTLABEL="$2"
+            shift;;
+    esac
+    shift
+done
+
+[[ -z "$INLABEL" ]] && INLABEL="IN "
+[[ -z "$OUTLABEL" ]] && OUTLABEL="OUT "
+
+if [[ -z $INTERFACE ]] && [[ -n $BLOCK_INSTANCE ]]; then
+  INTERFACE=$BLOCK_INSTANCE
+elif [[ -z $INTERFACE ]]; then
+  INTERFACE=$(ip route | awk '/^default/ { print $5 ; exit }')
+fi
+
+[[ -z "$INTERFACE" ]] && exit
+
+if ! [ -e "/sys/class/net/${INTERFACE}/operstate" ] || \
+    (! [ "$TREAT_UNKNOWN_AS_UP" = "1" ] &&
+    ! [ "`cat /sys/class/net/${INTERFACE}/operstate`" = "up" ])
+then
+    echo "󰌙 "  #"$INTERFACE down"
+    echo "󰌙 "  #"$INTERFACE down"
+    echo "#F28B82"
+    exit 0
+fi
+
+path="/tmp/$(basename $0)-${INTERFACE}"
+
+read rx < "/sys/class/net/${INTERFACE}/statistics/rx_bytes"
+read tx < "/sys/class/net/${INTERFACE}/statistics/tx_bytes"
+
+time="$(date +%s)"
+
+if ! [[ -f "${path}" ]]; then
+  echo "${time} ${rx} ${tx}" > "${path}"
+  chmod 0600 "${path}"
+fi
+
+read old < "${path}"
+echo "${time} ${rx} ${tx}" > "${path}"
+
+old=(${old//;/ })
+time_diff=$(( $time - ${old[0]} ))
+
+[[ "${time_diff}" -gt 0 ]] || exit
+
+rx_diff=$(( $rx - ${old[1]} ))
+tx_diff=$(( $tx - ${old[2]} ))
+rx_rate=$(( $rx_diff / $time_diff ))
+tx_rate=$(( $tx_diff / $time_diff ))
+
+echo -n "$INLABEL"
+rx_kib=$(( $rx_rate >> 10 ))
+if hash bc 2>/dev/null && [[ "$rx_rate" -gt 1048576 ]]; then
+  printf '%sM' "`echo "scale=1; $rx_kib / 1024" | bc`"
+else
+  echo -n "${rx_kib}K"
+fi
+
+echo -n " "
+
+echo -n "$OUTLABEL"
+tx_kib=$(( $tx_rate >> 10 ))
+if hash bc 2>/dev/null && [[ "$tx_rate" -gt 1048576 ]]; then
+  printf '%sM\n' "`echo "scale=1; $tx_kib / 1024" | bc`"
+else
+  echo "${tx_kib}K"
+fi

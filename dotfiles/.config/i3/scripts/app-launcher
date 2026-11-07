@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+# myi3 di manuel - v1.0
+
+exec rofi -show drun -theme $HOME/.config/rofi/app-menu.rasi

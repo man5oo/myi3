@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+
+# myi3 di manuel - v1.0
+
+ROFI_OPTIONS=(-dmenu -i -theme "$HOME/.config/rofi/power-menu.rasi")
+
+enable_confirmation=true
+
+usage="$(basename "$0") [-h] [-c] -- display a rofi menu for shutdown, reboot, lock etc.
+
+where:
+    -h  show this help text
+    -c  ask for user confirmation
+
+This script depends on:
+  - systemd,
+  - i3,
+  - rofi."
+
+while getopts "hc" option; do
+  case "${option}" in
+    h) echo "${usage}"
+       exit 0
+       ;;
+    c) enable_confirmation=true
+       ;;
+    *) exit 1
+       ;;
+  esac
+done
+
+command -v systemctl &> /dev/null || exit 1
+
+# Entries, shown in this order:  "label shown in rofi|confirm|command"
+#   - label:   anything you like (icon, text); never used for matching
+#   - confirm: "confirm" to ask Yes/No first, empty to run immediately
+#   - command: run through i3; empty = do nothing (Cancel)
+entries=(
+  "   Shutdown|confirm|systemctl poweroff"
+  "   Reboot|confirm|systemctl reboot"
+  "󰤄   Suspend|confirm|systemctl suspend"
+  "   Lock||$HOME/.config/i3/scripts/i3lock"
+  "   Logout|confirm|i3-msg exit"
+  "   Cancel||"
+)
+
+parse_entry() {
+  IFS='|' read -r label confirm cmd <<< "${entries[$1]}"
+}
+
+run_command() {
+  i3-msg -q "exec --no-startup-id ${cmd}"
+}
+
+
+
+ask_confirmation() {
+  local answer
+  answer=$(printf '%s\n' "Yes" "No" \
+    | rofi "${ROFI_OPTIONS[@]}" -format i \
+		-theme-str 'entry { placeholder: "Are you sure?"; }' \
+        -theme-str 'listview { lines: 2; }' \
+        -theme-str 'window { width: 250px; }')
+  [[ "${answer}" == 0 ]] && run_command
+}
+
+index=$(for entry in "${entries[@]}"; do printf '%s\n' "${entry%%|*}"; done \
+  | rofi "${ROFI_OPTIONS[@]}" -p "Power" -format i)
+
+[[ -n "${index}" ]] || exit 0  
+
+parse_entry "${index}"
+[[ -n "${cmd}" ]] || exit 0     
+
+if [[ "${enable_confirmation}" == true && -n "${confirm}" ]]; then
+  ask_confirmation
+else
+  run_command
+fi

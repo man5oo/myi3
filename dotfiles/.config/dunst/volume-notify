@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# myi3 di manuel - v1.0
+
+STATUS=$(wpctl get-volume @DEFAULT_AUDIO_SINK@)
+VOL=$(echo "$STATUS" | awk '{printf "%d", $2*100}')
+
+if echo "$STATUS" | grep -q MUTED; then
+  ICON=audio-volume-muted-symbolic
+else
+  if [ "$VOL" -lt 30 ]; then
+    ICON=audio-volume-low-symbolic
+  elif [ "$VOL" -lt 70 ]; then
+    ICON=audio-volume-medium-symbolic
+  else
+    ICON=audio-volume-high-symbolic
+  fi
+fi
+
+/usr/bin/dunstify \
+  -a volume \
+  -i $ICON \
+  -h int:value:"$VOL" \
+  -h int:max:100 \
+  -r 9993 \
+  "Volume $VOL%"

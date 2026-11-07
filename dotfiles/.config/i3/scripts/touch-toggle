@@ -1,0 +1,18 @@
+#!/bin/sh
+
+# myi3 di manuel - v1.0
+
+name="${TOUCHSCREEN_DEVICE:-ELAN Touchscreen}"
+id=$(xinput list --id-only "$name" 2>/dev/null) || exit 1
+
+if xinput list-props "$id" | grep -q 'Device Enabled.*:[[:space:]]*1'; then
+    xinput disable "$id"
+    ICON=touchpad-disabled-symbolic
+    TEXT="Touchscreen Disabled"
+    /usr/bin/dunstify -i "$ICON" "$TEXT"
+else
+    xinput enable "$id"
+    ICON=touchpad-enabled-symbolic
+    TEXT="Touchscreen Enabled"
+    /usr/bin/dunstify -i "$ICON" "$TEXT"
+fi

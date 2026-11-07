@@ -1,0 +1,12 @@
+/* myi3 di manuel - v1.0 */
+
+@import "config.rasi"
+
+entry {
+    placeholder: "Search clipboard";
+}
+
+listview {
+    lines:   10;
+    columns: 1;
+}

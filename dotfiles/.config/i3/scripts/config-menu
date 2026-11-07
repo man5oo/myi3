@@ -1,0 +1,252 @@
+#!/usr/bin/env bash
+
+# myi3 di manuel - v1.0
+
+set -uo pipefail
+
+# ============================================================
+# CONFIGURATION
+# ============================================================
+
+CONFIG_DIR="$HOME/.config"
+THEME="$HOME/.config/rofi/config-menu.rasi"
+
+ROFI="rofi"
+EDITOR="geany"
+
+# ------------------------------------------------------------
+# GLYPHS
+# ------------------------------------------------------------
+
+GLYPH_DIR="󰉋"
+GLYPH_FILE="󰈔"
+GLYPH_BASH=""
+GLYPH_STYLE=""
+GLYPH_JSON=""
+GLYPH_PYTHON=""
+GLYPH_MARKDOWN=""
+GLYPH_IMAGE="󰋩"
+GLYPH_PARENT="󰁝"
+GLYPH_SEARCH="󰍉"
+
+LABEL_SEARCH="$GLYPH_SEARCH  Search all configs"
+
+# ------------------------------------------------------------
+# ROFI OPTIONS
+# ------------------------------------------------------------
+
+ROFI_OPTIONS=(
+    -dmenu
+    -i
+    -matching fuzzy
+    -no-custom
+    -no-show-icons
+    -theme "$THEME"
+    -format i
+)
+
+# ============================================================
+# FUNCTIONS
+# ============================================================
+
+notify() {
+    local title="$1"
+    local message="$2"
+
+    if command -v dunstify >/dev/null 2>&1; then
+        dunstify "$title" "$message"
+    elif command -v notify-send >/dev/null 2>&1; then
+        notify-send "$title" "$message"
+    fi
+}
+
+# ------------------------------------------------------------
+# FILE GLYPH
+# ------------------------------------------------------------
+
+get_file_glyph() {
+    local filename="${1,,}"
+
+    case "$filename" in
+        *.sh)          printf '%s' "$GLYPH_BASH" ;;
+        *.rasi|*.css)  printf '%s' "$GLYPH_STYLE" ;;
+        *.json)        printf '%s' "$GLYPH_JSON" ;;
+        *.py)          printf '%s' "$GLYPH_PYTHON" ;;
+        *.md|*.txt)    printf '%s' "$GLYPH_MARKDOWN" ;;
+        *.png|*.jpg|*.jpeg|*.webp|*.svg)
+                       printf '%s' "$GLYPH_IMAGE" ;;
+        *)             printf '%s' "$GLYPH_FILE" ;;
+    esac
+}
+
+# ------------------------------------------------------------
+# ROFI MENU
+# ------------------------------------------------------------
+
+show_menu() {
+    local prompt="$1"
+    shift
+
+    local output
+
+    if ! output=$(printf '%s\n' "$@" |
+        "$ROFI" "${ROFI_OPTIONS[@]}" -p "$prompt"); then
+        return 1
+    fi
+
+    [[ "$output" =~ ^[0-9]+$ ]] || return 1
+
+    ROFI_INDEX="$output"
+    return 0
+}
+
+# ------------------------------------------------------------
+# OPEN FILE
+# ------------------------------------------------------------
+
+open_file() {
+    local path="$1"
+
+    if [[ -f "$path" ]]; then
+        "$EDITOR" "$path" >/dev/null 2>&1 &
+    fi
+}
+
+# ------------------------------------------------------------
+# GLOBAL SEARCH
+# ------------------------------------------------------------
+
+global_search() {
+    local -a labels=()
+    local -a paths=()
+
+    local file relative glyph
+    local index
+
+    while IFS= read -r -d '' file; do
+        relative="${file#"$CONFIG_DIR"/}"
+        glyph=$(get_file_glyph "$file")
+
+        labels+=("$glyph  $relative")
+        paths+=("$file")
+    done < <(
+        find "$CONFIG_DIR" -type f -print0 2>/dev/null |
+            LC_ALL=C sort -z
+    )
+
+    if ((${#labels[@]} == 0)); then
+        notify "Config Menu" "No configuration files found"
+        return 0
+    fi
+
+    show_menu "Search: ~/.config" "${labels[@]}" || return 0
+
+    index="$ROFI_INDEX"
+
+    if ((index < ${#paths[@]})); then
+        open_file "${paths[index]}"
+    fi
+}
+
+# ------------------------------------------------------------
+# DIRECTORY BROWSER
+# ------------------------------------------------------------
+
+browse_directory() {
+    local current_dir="$1"
+
+    local -a labels=()
+    local -a paths=()
+    local -a types=()
+
+    local item name glyph
+    local index relative
+
+    if [[ "$current_dir" != "$CONFIG_DIR" ]]; then
+        labels+=("$GLYPH_PARENT  ..")
+        paths+=("$(dirname "$current_dir")")
+        types+=("parent")
+    fi
+
+    if [[ "$current_dir" == "$CONFIG_DIR" ]]; then
+        labels+=("$LABEL_SEARCH")
+        paths+=("")
+        types+=("search")
+    fi
+
+    while IFS= read -r -d '' item; do
+        name="${item##*/}"
+
+        labels+=("$GLYPH_DIR  $name/")
+        paths+=("$item")
+        types+=("directory")
+    done < <(
+        find "$current_dir" \
+            -mindepth 1 -maxdepth 1 \
+            -type d -print0 2>/dev/null |
+            LC_ALL=C sort -z
+    )
+
+    while IFS= read -r -d '' item; do
+        name="${item##*/}"
+        glyph=$(get_file_glyph "$name")
+
+        labels+=("$glyph  $name")
+        paths+=("$item")
+        types+=("file")
+    done < <(
+        find "$current_dir" \
+            -mindepth 1 -maxdepth 1 \
+            -type f -print0 2>/dev/null |
+            LC_ALL=C sort -z
+    )
+
+    relative="${current_dir#"$CONFIG_DIR"}"
+    [[ -n "$relative" ]] || relative="/"
+
+    if ! show_menu "CONFIG $relative" "${labels[@]}"; then
+        if [[ "$current_dir" != "$CONFIG_DIR" ]]; then
+            CURRENT_DIR="$(dirname "$current_dir")"
+            return 0
+        fi
+
+        return 1
+    fi
+
+    index="$ROFI_INDEX"
+
+    ((index < ${#labels[@]})) || return 0
+
+    case "${types[index]}" in
+
+        search)
+            global_search
+            ;;
+
+        parent|directory)
+            CURRENT_DIR="${paths[index]}"
+            ;;
+
+        file)
+            open_file "${paths[index]}"
+            ;;
+
+    esac
+
+    return 0
+}
+
+# ============================================================
+# MAIN
+# ============================================================
+
+command -v "$ROFI" >/dev/null 2>&1 || exit 1
+command -v "$EDITOR" >/dev/null 2>&1 || exit 1
+
+[[ -d "$CONFIG_DIR" ]] || exit 1
+
+CURRENT_DIR="$CONFIG_DIR"
+
+while true; do
+    browse_directory "$CURRENT_DIR" || exit 0
+done

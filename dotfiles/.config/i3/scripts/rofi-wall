@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+# myi3 di manuel - v1.0
+
+WALL_DIR="${WALLPAPER_DIR:-$HOME/Pictures/Wallpapers}"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/rofi-wallpaper-thumbs"
+THEME="$HOME/.config/rofi/wallpaper.rasi"
+THUMB_W="${THUMB_W:-320}" THUMB_H="${THUMB_H:-180}"
+
+im=$(command -v magick || command -v convert) || { echo "ImageMagick not found" >&2; exit 1; }
+[[ -d $WALL_DIR ]] || { echo "Folder not found: $WALL_DIR" >&2; exit 1; }
+mkdir -p "$CACHE_DIR"
+
+shopt -s nullglob
+images=()
+for f in "$WALL_DIR"/*; do
+  case "${f,,}" in *.jpg|*.jpeg|*.png|*.webp) images+=("$f") ;; esac
+done
+(( ${#images[@]} )) || { echo "No wallpaper was found in $WALL_DIR" >&2; exit 1; }
+
+choice=$(
+  for img in "${images[@]}"; do
+    name=${img##*/}
+    thumb="$CACHE_DIR/$name.png"
+    if [[ ! $thumb -nt $img ]]; then
+      "$im" "$img" -define jpeg:size="${THUMB_W}x${THUMB_H}" -thumbnail "${THUMB_W}x${THUMB_H}^" \
+            -gravity center -extent "${THUMB_W}x${THUMB_H}" "$thumb" 2>/dev/null || continue
+    fi
+    printf '%s\0icon\x1f%s\n' "$name" "$thumb"
+  done | rofi -dmenu -i -no-custom -show-icons -p "Wallpaper:" -theme "$THEME"
+)
+
+[[ -n $choice && $choice != */* && -f $WALL_DIR/$choice ]] || exit 0
+feh --bg-fill "$WALL_DIR/$choice"
+dunstify "Wallpaper changed" "${choice}" -i "preferences-wallpaper"

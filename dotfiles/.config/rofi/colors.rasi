@@ -1,0 +1,38 @@
+/* myi3 di manuel - v1.0 */
+
+* {
+	bg:            rgb(27, 28, 30);
+	fg:            rgb(232, 234, 237);
+	charcoal:      rgb(35, 36, 39);
+	dark3:         rgb(42, 43, 46);
+	gray2:         rgb(154, 160, 166);
+	red:           rgb(242, 139, 130);
+	yellow:        rgb(253, 214, 99);
+	green:         rgb(129, 201, 149);
+	lightblue:     rgb(138, 180, 248);
+	lightfg:                     @fg;
+    	lightbg:                     @dark3;
+    	foreground:                  @fg;
+    	background:                  @bg;
+	background-color:            @bg;
+    	separatorcolor:              @dark3;
+    	border-color:                @lightblue;
+    	selected-normal-foreground:  @bg;
+    	selected-normal-background:  @lightblue;
+    	selected-active-foreground:  @bg;
+    	selected-active-background:  @lightblue;
+    	selected-urgent-foreground:  @bg;
+    	selected-urgent-background:  @red;
+    	normal-foreground:           @foreground;
+    	normal-background:           @background;
+    	active-foreground:           @lightblue;
+    	active-background:           @background;
+    	urgent-foreground:           @red;
+    	urgent-background:           @background;
+    	alternate-normal-foreground: @foreground;
+    	alternate-normal-background: @charcoal;
+    	alternate-active-foreground: @lightblue;
+    	alternate-active-background: @charcoal;
+    	alternate-urgent-foreground: @red;
+    	alternate-urgent-background: @charcoal;
+ }

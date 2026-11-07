@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+# myi3 di manuel - v1.0
+#
+# Configuration (environment variables, set them in i3blocks.conf):
+#   LABEL          text/glyph shown before the count          (empty)
+#   BASE_COLOR     colour when the system is up to date       (#E8EAED)
+#   UPDATE_COLOR   colour when updates are pending            (#8AB4F8)
+#   ERROR_COLOR    colour when the check fails                (#F28B82)
+#   AUR            true = also count AUR updates (yay/paru)   (false)
+#   QUIET          true = hide the block when up to date      (false)
+#   WATCH          space-separated regexes; matching packages
+#                  are highlighted in the bar, e.g. "linux.* nvidia.*"
+#   NOTIFY         click | always | never                     (click)
+#   MAX_LINES      packages listed in the notification        (10)
+#   CHECK_TIMEOUT  seconds before a check is aborted          (90)
+#
+# Requires: pacman-contrib (checkupdates). Optional: yay or paru, dunst.
+
+set -u
+
+LABEL="${LABEL:-}"
+BASE_COLOR="${BASE_COLOR:-#E8EAED}"
+UPDATE_COLOR="${UPDATE_COLOR:-#8AB4F8}"
+ERROR_COLOR="${ERROR_COLOR:-#F28B82}"
+AUR="${AUR:-true}"
+QUIET="${QUIET:-false}"
+WATCH="${WATCH:-}"
+NOTIFY="${NOTIFY:-click}"
+MAX_LINES="${MAX_LINES:-10}"
+CHECK_TIMEOUT="${CHECK_TIMEOUT:-90}"
+
+is_true() {
+    case "${1,,}" in 1|t|true|y|yes) return 0 ;; *) return 1 ;; esac
+}
+
+want_notify() {
+    case "$NOTIFY" in
+        always) return 0 ;;
+        click)  [[ -n "${BLOCK_BUTTON:-}" ]] ;;
+        *)      return 1 ;;
+    esac
+}
+
+notify() {
+    local urgency=$1 icon=$2 title=$3 body=${4:-}
+    if command -v dunstify >/dev/null 2>&1; then
+        dunstify -a arch_update -u "$urgency" -i "$icon" \
+            -h string:x-dunst-stack-tag:arch_update "$title" "$body"
+    elif command -v notify-send >/dev/null 2>&1; then
+        notify-send -a arch_update -u "$urgency" -i "$icon" \
+            -h string:x-dunst-stack-tag:arch_update "$title" "$body"
+    fi
+}
+
+print_block() {
+    local colour=$1 full=$2 short=${3:-$2}
+    printf "%s<span color='%s'>%s</span>\n" "$LABEL" "$colour" "$full"
+    printf "%s<span color='%s'>%s</span>\n" "$LABEL" "$colour" "$short"
+}
+
+if [[ -n "${BLOCK_BUTTON:-}" ]] && want_notify; then
+    notify low software-update-available-symbolic "Checking for updates…"
+fi
+
+exec 9>"${XDG_RUNTIME_DIR:-/tmp}/arch_update.lock"
+flock -w "$CHECK_TIMEOUT" 9 || exit 0
+
+error=0
+lines=$(timeout "$CHECK_TIMEOUT" checkupdates 2>/dev/null)
+case $? in
+    0) ;;
+    2) lines="" ;;
+    *) error=1; lines="" ;;
+esac
+
+if (( ! error )) && is_true "$AUR"; then
+    helper=$(command -v yay || command -v paru || true)
+    if [[ -n "$helper" ]]; then
+        aur=$(timeout "$CHECK_TIMEOUT" "$helper" -Qua 2>/dev/null) || true
+        [[ -n "$aur" ]] && lines+="${lines:+$'\n'}$aur"
+    fi
+fi
+
+if (( error )); then
+    print_block "$ERROR_COLOR" "?"
+    want_notify && notify normal dialog-warning-symbolic \
+        "Update check failed" \
+        "Could not read the package databases (offline, locked, or pacman-contrib missing)."
+    exit 0
+fi
+
+count=$(grep -c . <<<"$lines")
+if (( count == 0 )); then
+    is_true "$QUIET" || print_block "$BASE_COLOR" "0"
+    want_notify && notify low emblem-ok-symbolic "System is up to date"
+    exit 0
+fi
+
+matches=""
+if [[ -n "$WATCH" ]]; then
+    read -ra watch_list <<<"$WATCH"  
+    names=$(awk '{print $1}' <<<"$lines")
+    for pattern in "${watch_list[@]}"; do
+        matches+="$(grep -E -- "^($pattern)" <<<"$names")"$'\n'
+    done
+    matches=$(sed '/^$/d' <<<"$matches" | sort -u | paste -sd, - | sed 's/,/, /g')
+fi
+
+full="$count"
+short="$count"
+if [[ -n "$matches" ]]; then
+    full+=" [$matches]"
+    short+="*"
+fi
+print_block "$UPDATE_COLOR" "$full" "$short"
+
+if want_notify; then
+    (( count == 1 )) && title="1 update available" || title="$count updates available"
+    body=$(head -n "$MAX_LINES" <<<"$lines" | sed 's/ -> / → /')
+    (( count > MAX_LINES )) && body+=$'\n'"… and $(( count - MAX_LINES )) more"
+    notify normal software-update-available-symbolic "$title" "$body"
+fi

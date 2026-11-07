@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+
+# myi3 di manuel - v1.0
+
+set -u
+
+ROFI_THEME="${HOME}/.config/rofi/power-profiles-menu.rasi"
+SYSFS="${SYSFS:-/sys}"
+PSDIR="$SYSFS/class/power_supply"
+BAT_NUMBER="${BAT_NUMBER:-0}"
+BAT_NAME="${BAT_NAME:-}"
+
+notify_user() {
+    local urgency="$1" title="$2" message="$3"
+
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send -u "$urgency" "$title" "$message"
+    elif command -v dunstify >/dev/null 2>&1; then
+        dunstify -u "$urgency" "$title" "$message"
+    fi
+}
+
+show_error() {
+    local message="$1"
+
+    if command -v rofi >/dev/null 2>&1; then
+        rofi -e "$message" -theme "$ROFI_THEME"
+    else
+        notify_user critical "Power Profiles" "$message"
+    fi
+}
+
+rd() {
+    local -n output=$2
+    output=""
+    [[ -r "$1" ]] && { read -r output < "$1"; } 2>/dev/null
+    return 0
+}
+
+get_battery_info() {
+    local dir type scope index=0 battery=""
+    local status="N/A" capacity="N/A" now="" full="" rate=0 voltage=""
+    local power_uw=0 unit="" seconds=0 remaining="N/A" power="N/A"
+
+    if [[ -n "$BAT_NAME" ]]; then
+        [[ -d "$PSDIR/$BAT_NAME" ]] && battery="$PSDIR/$BAT_NAME"
+    else
+        for dir in "$PSDIR"/*; do
+            rd "$dir/type" type
+            [[ "$type" == Battery ]] || continue
+            rd "$dir/scope" scope
+            [[ "$scope" == Device ]] && continue
+            if (( index == BAT_NUMBER )); then
+                battery="$dir"
+                break
+            fi
+            ((index += 1))
+        done
+    fi
+
+    if [[ -n "$battery" ]]; then
+        rd "$battery/status" status
+        [[ -n "$status" ]] || status="Unknown"
+
+        rd "$battery/energy_now" now
+        if [[ "$now" =~ ^[0-9]+$ ]]; then
+            unit="energy"
+        else
+            rd "$battery/charge_now" now
+            unit="charge"
+        fi
+        rd "$battery/${unit}_full" full
+        rd "$battery/capacity" capacity
+
+        if ! [[ "$capacity" =~ ^[0-9]+$ ]] && [[ "$now" =~ ^[0-9]+$ && "$full" =~ ^[0-9]+$ ]] && (( full > 0 )); then
+            capacity=$(( now * 100 / full ))
+        fi
+
+        if [[ "$unit" == energy ]]; then
+            rd "$battery/power_now" rate
+            [[ "$rate" =~ ^-?[0-9]+$ ]] || rate=0
+            (( rate < 0 )) && rate=$(( -rate ))
+            power_uw=$rate
+        else
+            rd "$battery/current_now" rate
+            rd "$battery/voltage_now" voltage
+            [[ "$rate" =~ ^-?[0-9]+$ ]] || rate=0
+            (( rate < 0 )) && rate=$(( -rate ))
+            [[ "$voltage" =~ ^[0-9]+$ ]] && power_uw=$(( rate * voltage / 1000000 ))
+        fi
+
+        if (( power_uw > 0 )); then
+            printf -v power '%d.%d W' "$(( power_uw / 1000000 ))" "$(( (power_uw % 1000000) / 100000 ))"
+        fi
+
+        if (( rate > 0 )) && [[ "$now" =~ ^[0-9]+$ ]]; then
+            case "$status" in
+                Discharging) seconds=$(( now * 3600 / rate )) ;;
+                Charging) [[ "$full" =~ ^[0-9]+$ ]] && (( full > now )) && seconds=$(( (full - now) * 3600 / rate )) ;;
+            esac
+        fi
+        if (( seconds > 0 && seconds < 360000 )); then
+            printf -v remaining '%02d:%02d' "$(( seconds / 3600 ))" "$(( (seconds % 3600) / 60 ))"
+        fi
+    fi
+
+    printf 'Battery: %s%%\nStatus: %s\nRemaining time: %s\nPower: %s' \
+        "$capacity" "$status" "$remaining" "$power"
+}
+
+if ! command -v rofi >/dev/null 2>&1; then
+    notify_user critical "Power Profiles" "Rofi is not installed."
+    exit 1
+fi
+
+if ! command -v powerprofilesctl >/dev/null 2>&1; then
+    show_error "powerprofilesctl is not installed."
+    exit 1
+fi
+
+current_profile="$(powerprofilesctl get 2>/dev/null)" || {
+    show_error $'Power Profiles service is unavailable.\nCheck that power-profiles-daemon is running.'
+    exit 1
+}
+
+case "$current_profile" in
+    power-saver) current_label="Power Saver" ;;
+    balanced) current_label="Balanced" ;;
+    performance) current_label="Performance" ;;
+    *) current_label="${current_profile:-Unknown}" ;;
+esac
+
+battery_message="$(get_battery_info)"
+printf -v menu_message 'Current profile: %s\n%s' "$current_label" "$battery_message"
+options=$'  Power Saver\n  Balanced\n  Performance'
+
+chosen="$(printf '%s\n' "$options" | rofi \
+    -dmenu \
+    -i \
+    -no-custom \
+    -mesg "$menu_message" \
+    -theme "$ROFI_THEME")" || exit 0
+
+case "$chosen" in
+    '  Power Saver') profile="power-saver"; label="Power Saver" ;;
+    '  Balanced') profile="balanced"; label="Balanced" ;;
+    '  Performance') profile="performance"; label="Performance" ;;
+    *) exit 0 ;;
+esac
+
+if powerprofilesctl set "$profile"; then
+    notify_user normal "Power Profile Changed" "New profile: ${label}"
+else
+    notify_user critical "Power Profile Error" "Could not set profile: ${label}"
+    exit 1
+fi

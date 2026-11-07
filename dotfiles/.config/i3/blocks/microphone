@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+# myi3 di manuel - v1.0
+
+SOURCE="@DEFAULT_AUDIO_SOURCE@"
+
+case $BLOCK_BUTTON in
+  1) wpctl set-volume $SOURCE 5%+ ;;
+  2) wpctl set-mute $SOURCE toggle ;;
+  3) wpctl set-volume $SOURCE 5%- ;;
+esac
+
+status=$(wpctl get-volume $SOURCE)
+pct=$(echo "$status" | awk '{printf "%d", $2*100}')
+
+if [[ "$status" == *MUTED* ]]; then
+    echo " "
+    echo " "
+    echo "#F28B82"
+else
+    echo " ${pct}%"
+    echo " ${pct}%"
+fi

@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+
+# myi3 di manuel - v1.0
+
+set -u
+
+SCREENSHOT_DIR="$HOME/Pictures/Screenshots"
+ROFI_THEME="$HOME/.config/rofi/screenshot.rasi"
+
+SCROT="scrot"
+ROFI="rofi"
+
+ROFI_CLOSE_DELAY="0.3"
+
+LABEL_FULLSCREEN="   Full screen"
+LABEL_ACTIVE_WINDOW="󰖯   Active window"
+LABEL_REGION="󰆞   Select region"
+LABEL_WINDOW="󰖲   Select window"
+LABEL_ALL_MONITORS="󰍹   All monitors"
+LABEL_DELAYED="󰔛   Delayed capture"
+
+LABEL_DELAY_3="3 seconds"
+LABEL_DELAY_5="5 seconds"
+LABEL_DELAY_10="10 seconds"
+
+notify() {
+    local title="$1"
+    local message="$2"
+
+    if command -v dunstify >/dev/null 2>&1; then
+        dunstify "$title" "$message"
+    elif command -v notify-send >/dev/null 2>&1; then
+        notify-send "$title" "$message"
+    fi
+}
+
+fail() {
+    notify "Screenshot error" "$1"
+    exit 1
+}
+
+show_menu() {
+    local prompt="$1"
+    shift
+
+    printf '%s\n' "$@" |
+        "$ROFI" -dmenu -i -no-custom \
+        -p "$prompt" \
+        -theme "$ROFI_THEME" \
+        -theme-str 'entry {placeholder: "Select options";}'
+}
+
+make_output_path() {
+    local timestamp suffix candidate
+
+    timestamp=$(date '+%Y-%m-%d_%H-%M-%S')
+    candidate="$SCREENSHOT_DIR/$timestamp.png"
+    suffix=1
+
+    while [[ -e "$candidate" ]]; do
+        candidate="$SCREENSHOT_DIR/${timestamp}_$(printf '%02d' "$suffix").png"
+        ((suffix += 1))
+    done
+
+    printf '%s\n' "$candidate"
+}
+
+capture() {
+    local mode="$1"
+    local delay="${2:-0}"
+    local output
+
+    local -a options=(-z)
+
+    output=$(make_output_path)
+
+    case "$mode" in
+        fullscreen)
+            ;;
+        active-window)
+            options+=(-u)
+            ;;
+        region)
+            options+=(-s)
+            ;;
+        window)
+            options+=(-s -b)
+            ;;
+        all-monitors)
+            options+=(-m)
+            ;;
+        *)
+            fail "Unknown screenshot mode: $mode"
+            ;;
+    esac
+
+    if [[ "$delay" =~ ^[0-9]+$ ]] && ((delay > 0)); then
+        options+=(-d "$delay" -c)
+    fi
+
+    sleep "$ROFI_CLOSE_DELAY"
+
+    if ! "$SCROT" "${options[@]}" "$output"; then
+        rm -f -- "$output"
+        notify "Screenshot cancelled" "No screenshot was saved."
+        return 1
+    fi
+
+    if [[ -s "$output" ]]; then
+        notify "Screenshot saved" "${output/#$HOME/\~}"
+    else
+        rm -f -- "$output"
+        notify "Screenshot error" "Scrot did not create an image."
+        return 1
+    fi
+}
+
+choice=$(show_menu "Screenshot" \
+    "$LABEL_FULLSCREEN" \
+    "$LABEL_ACTIVE_WINDOW" \
+    "$LABEL_REGION" \
+    "$LABEL_WINDOW" \
+    "$LABEL_ALL_MONITORS" \
+    "$LABEL_DELAYED") || exit 0
+
+case "$choice" in
+    "$LABEL_FULLSCREEN")
+        capture fullscreen
+        ;;
+    "$LABEL_ACTIVE_WINDOW")
+        capture active-window
+        ;;
+    "$LABEL_REGION")
+        capture region
+        ;;
+    "$LABEL_WINDOW")
+        capture window
+        ;;
+    "$LABEL_ALL_MONITORS")
+        capture all-monitors
+        ;;
+    "$LABEL_DELAYED")
+
+        delayed_choice=$(show_menu "Delayed capture" \
+            "$LABEL_FULLSCREEN" \
+            "$LABEL_ACTIVE_WINDOW" \
+            "$LABEL_ALL_MONITORS") || exit 0
+
+        case "$delayed_choice" in
+            "$LABEL_FULLSCREEN") mode=fullscreen ;;
+            "$LABEL_ACTIVE_WINDOW") mode=active-window ;;
+            "$LABEL_ALL_MONITORS") mode=all-monitors ;;
+            *) exit 0 ;;
+        esac
+
+        delay_choice=$(show_menu "Delay" \
+            "$LABEL_DELAY_3" \
+            "$LABEL_DELAY_5" \
+            "$LABEL_DELAY_10") || exit 0
+
+        case "$delay_choice" in
+            "$LABEL_DELAY_3") delay=3 ;;
+            "$LABEL_DELAY_5") delay=5 ;;
+            "$LABEL_DELAY_10") delay=10 ;;
+            *) exit 0 ;;
+        esac
+
+        capture "$mode" "$delay"
+        ;;
+esac

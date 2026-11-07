@@ -1,0 +1,249 @@
+#!/usr/bin/env bash
+
+# myi3 di manuel - v1.0
+
+set -uo pipefail
+
+ROFI="rofi"
+THEME="$HOME/.config/rofi/menu.rasi"
+
+TERMINAL="alacritty"
+CONFIG_MENU="$HOME/.config/i3/scripts/config-menu"
+POWER_PROFILE="$HOME/.config/i3/scripts/power-profile"
+
+AUDIO_MIXER="pulsemixer"
+
+KEYBINDINGS_FILE="$HOME/.config/i3/shortcuts.md"
+KEYBINDINGS_PAGER="less"
+
+NOTIFICATION_CMD=""
+
+ENTRY_IDS=(
+    "config"
+    "pacseek"
+    "htop"
+    "audio"
+    "keybindings"
+    "powerprofile"
+    "fastfetch"
+    "logs"
+)
+
+ENTRY_NAMES=(
+    "Edit Configuration"
+    "Package Manager" #pacseek
+    "System Monitor" #htop
+    "Audio Mixer"
+    "Keybindings"
+    "Power Profile"
+    "About" #fasfetch
+    "System Logs"
+)
+
+ENTRY_ICONS=(
+    "󰉋 "
+    " "
+    "󰄨 "
+    "󰕾 "
+    "󰌌 "
+    " "
+    "󰋽 "
+    "󰦖 "
+)
+
+notify() {
+    local title="$1"
+    local message="$2"
+
+    if [[ -n "$NOTIFICATION_CMD" ]] &&
+       command -v "$NOTIFICATION_CMD" >/dev/null 2>&1; then
+
+        "$NOTIFICATION_CMD" "$title" "$message" >/dev/null 2>&1
+
+    elif command -v dunstify >/dev/null 2>&1; then
+
+        dunstify "$title" "$message" >/dev/null 2>&1
+
+    elif command -v notify-send >/dev/null 2>&1; then
+
+        notify-send "$title" "$message" >/dev/null 2>&1
+
+    else
+        printf '%s: %s\n' "$title" "$message" >&2
+    fi
+}
+
+check_entries() {
+    local count="${#ENTRY_IDS[@]}"
+
+    if (( count == 0 ||
+          count != ${#ENTRY_NAMES[@]} ||
+          count != ${#ENTRY_ICONS[@]} )); then
+
+        notify "Quick Launcher" "Invalid menu configuration"
+        return 1
+    fi
+}
+
+up_time=$(uptime -p | sed 's/^up //')
+message=$(printf '   %s (%s)' "$USER" "$up_time")
+
+show_menu() {
+    local -a options=()
+    local output
+    local i
+
+    for ((i = 0; i < ${#ENTRY_IDS[@]}; i++)); do
+        options+=("${ENTRY_ICONS[i]}  ${ENTRY_NAMES[i]}")
+    done
+
+    if ! output=$(
+        printf '%s\n' "${options[@]}" |
+            "$ROFI" \
+                -dmenu \
+                -i \
+                -matching fuzzy \
+                -no-custom \
+                -format i \
+                -p "Quick Launcher" \
+                -theme "$THEME" \
+                -mesg "$message"
+    ); then
+        return 1
+    fi
+
+    [[ "$output" =~ ^[0-9]+$ ]] || return 1
+
+    SELECTED_INDEX="$output"
+    return 0
+}
+
+check_terminal() {
+    if ! command -v "$TERMINAL" >/dev/null 2>&1; then
+        notify "Quick Launcher" "Terminal not found: $TERMINAL"
+        return 1
+    fi
+}
+
+launch_terminal() {
+    check_terminal || return 1
+
+    nohup "$TERMINAL" -e "$@" >/dev/null 2>&1 &
+}
+
+launch_hold() {
+    check_terminal || return 1
+
+    nohup "$TERMINAL" -e bash -lc '
+        "$@"
+        status=$?
+
+        printf "\nProcess finished (exit status: %s).\n" "$status"
+        printf "Press any key to close this window..."
+
+        IFS= read -r -n 1 -s _
+
+        exit "$status"
+    ' quick-launcher "$@" >/dev/null 2>&1 &
+}
+
+launch_entry() {
+    local index="$1"
+    local id="${ENTRY_IDS[index]}"
+
+    case "$id" in
+
+        config)
+            if [[ ! -x "$CONFIG_MENU" ]]; then
+                notify "Quick Launcher" \
+                    "Config Menu not found or not executable"
+                return 1
+            fi
+
+            nohup "$CONFIG_MENU" >/dev/null 2>&1 &
+            ;;
+            
+        powerprofile)
+            if [[ ! -x "$POWER_PROFILE" ]]; then
+                notify "Quick Launcher" \
+                    "Power Profile not found or not executable"
+                return 1
+            fi
+
+            nohup "$POWER_PROFILE" >/dev/null 2>&1 &
+            ;;
+
+        pacseek)
+            check_command "pacseek" "Pacseek" || return 1
+            launch_terminal pacseek
+            ;;
+
+        htop)
+            check_command "htop" "Htop" || return 1
+            launch_terminal htop
+            ;;
+
+        fastfetch)
+            check_command "fastfetch" "Fastfetch" || return 1
+            launch_hold fastfetch
+            ;;
+
+        logs)
+            check_command "journalctl" "System Logs" || return 1
+            launch_hold journalctl -f
+            ;;
+
+        audio)
+            check_command "$AUDIO_MIXER" "Audio Mixer" || return 1
+            launch_terminal "$AUDIO_MIXER"
+            ;;
+
+        keybindings)
+            if [[ ! -f "$KEYBINDINGS_FILE" ]]; then
+                notify "Quick Launcher" \
+                    "Keybindings file not found: $KEYBINDINGS_FILE"
+                return 1
+            fi
+
+            check_command "$KEYBINDINGS_PAGER" "Keybindings pager" || return 1
+
+            launch_terminal "$KEYBINDINGS_PAGER" \
+                -R "$KEYBINDINGS_FILE"
+            ;;
+
+        *)
+            notify "Quick Launcher" "Unknown menu entry: $id"
+            return 1
+            ;;
+    esac
+}
+
+check_command() {
+    local command="$1"
+    local name="$2"
+
+    if ! command -v "$command" >/dev/null 2>&1; then
+        notify "Quick Launcher" "$name is not installed: $command"
+        return 1
+    fi
+}
+
+if ! command -v "$ROFI" >/dev/null 2>&1; then
+    notify "Quick Launcher" "Rofi not found: $ROFI"
+    exit 1
+fi
+
+if [[ ! -f "$THEME" ]]; then
+    notify "Quick Launcher" "Theme not found: $THEME"
+    exit 1
+fi
+
+check_entries || exit 1
+
+if show_menu; then
+    if (( SELECTED_INDEX < ${#ENTRY_IDS[@]} )); then
+        launch_entry "$SELECTED_INDEX"
+    fi
+fi
+
+exit 0

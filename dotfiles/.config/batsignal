@@ -1,0 +1,50 @@
+# i3 - manuel - v3.0
+
+# --- Battery level thresholds (percent) ---
+
+# Warning level
+-w
+25
+
+# Critical level
+-c
+10
+
+# Danger level (last-resort alert before shutdown)
+-d
+5
+
+# Full charge notification (fires at this level or when status
+# switches to "Full", whichever comes first)
+-f
+100
+
+# --- Behavior ---
+
+# Also notify when the charger is connected/disconnected
+-p
+
+# Let notifications auto-expire instead of staying until dismissed
+-e
+
+# --- Icon ---
+# Papirus icon name, consistent with the rest of the setup
+-I
+battery-caution-symbolic
+
+# --- Custom messages ---
+
+-W
+Battery is running low
+
+-C
+Battery level is critical - plug in now
+
+-F
+Battery fully charged
+
+-P
+Charger connected
+
+-U
+Charger disconnected

@@ -1,0 +1,22 @@
+/* ============================================================
+ * myi3 di manuel - v1.0
+ * ============================================================ */
+
+@import "config.rasi"
+
+inputbar {
+	enabled: false;
+}
+
+window {
+    width:    400px;
+}
+
+entry {
+    placeholder: "Select action";
+}
+
+listview {
+    lines: 6;
+    scrollbar:     false;
+}

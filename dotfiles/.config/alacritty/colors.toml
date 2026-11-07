@@ -1,0 +1,36 @@
+# myi3 di manuel - v1.0
+
+[colors]
+draw_bold_text_with_bright_colors = false
+
+[colors.primary]
+background = '0x1B1C1E'
+foreground = '0xE8EAED'
+
+[colors.cursor]
+text = '0x1B1C1E'
+cursor = '0x8AB4F8'
+
+[colors.selection]
+text = '0x1B1C1E'
+background = '0x8AB4F8'
+
+[colors.normal]
+black   = '0x1B1C1E'
+red     = '0xF28B82'
+green   = '0x81C995'
+yellow  = '0xFDD663'
+blue    = '0x8AB4F8'
+magenta = '0xD7AEFB'
+cyan    = '0x78D9EC'
+white   = '0xE8EAED'
+
+[colors.bright]
+black   = '0x5F6368'
+red     = '0xF28B82'
+green   = '0x81C995'
+yellow  = '0xFDD663'
+blue    = '0x8AB4F8'
+magenta = '0xD7AEFB'
+cyan    = '0x78D9EC'
+white   = '0xFFFFFF'

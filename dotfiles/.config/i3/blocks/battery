@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+
+# myi3 di manuel - v1.0
+#
+# Click (left): opens the Rofi power-profile selector with current battery info.
+#
+# Configuration (environment variables, set them in i3blocks.conf):
+#   BAT_NUMBER      which battery, 0-based, like `acpi` numbered them  (0)
+#   BAT_NAME        exact power_supply name instead (e.g. BAT1, CMB0)  (auto)
+#   LABEL           text/glyph shown before the percentage             (empty)
+#   NORMAL_COLOR    colour in normal conditions                        (#E8EAED)
+#   WARN_COLOR      colour below WARN_LEVEL while discharging          (#FDD663)
+#   CRIT_COLOR      colour below CRIT_LEVEL while discharging          (#F28B82)
+#   WARN_LEVEL      percent                                            (30)
+#   CRIT_LEVEL      percent                                            (20)
+#   URGENT_LEVEL    percent below which the block is flagged urgent    (5)
+#   ICON_DISCHARGING / ICON_CHARGING / ICON_PLUGGED   glyphs for the states
+
+set -u
+
+SYSFS="${SYSFS:-/sys}" 
+PSDIR="$SYSFS/class/power_supply"
+
+BAT_NUMBER="${BAT_NUMBER:-0}"
+BAT_NAME="${BAT_NAME:-}"
+LABEL="${LABEL:-}"
+NORMAL_COLOR="${NORMAL_COLOR-#E8EAED}"
+WARN_COLOR="${WARN_COLOR:-#FDD663}"
+CRIT_COLOR="${CRIT_COLOR:-#F28B82}"
+WARN_LEVEL="${WARN_LEVEL:-30}"
+CRIT_LEVEL="${CRIT_LEVEL:-20}"
+URGENT_LEVEL="${URGENT_LEVEL:-5}"
+NA_COLOR="#9AA0A6"
+
+_d=$'\xf3\xb0\x81\xb9'   
+_c=$'\xf3\xb0\x82\x84'   
+_p=$'\xf3\xb0\x82\x85'   
+ICON_DISCHARGING="${ICON_DISCHARGING-$_d}"
+ICON_CHARGING="${ICON_CHARGING-$_c}"
+ICON_PLUGGED="${ICON_PLUGGED-$_p}"
+
+[[ $BAT_NUMBER   =~ ^[0-9]+$ ]] || BAT_NUMBER=0
+[[ $WARN_LEVEL   =~ ^[0-9]+$ ]] || WARN_LEVEL=30
+[[ $CRIT_LEVEL   =~ ^[0-9]+$ ]] || CRIT_LEVEL=20
+[[ $URGENT_LEVEL =~ ^[0-9]+$ ]] || URGENT_LEVEL=5
+
+rd() {
+    local -n _out=$2
+    _out=""
+    [[ -r $1 ]] && { read -r _out < "$1"; } 2>/dev/null
+    return 0
+}
+
+BAT=""
+
+find_battery() {
+    local dir type scope n=0
+    if [[ -n $BAT_NAME ]]; then
+        [[ -d $PSDIR/$BAT_NAME ]] && BAT="$PSDIR/$BAT_NAME"
+        [[ -n $BAT ]]
+        return
+    fi
+    for dir in "$PSDIR"/*; do
+        rd "$dir/type" type
+        [[ $type == Battery ]] || continue
+        rd "$dir/scope" scope
+        [[ $scope == Device ]] && continue
+        if (( n == BAT_NUMBER )); then BAT=$dir; return 0; fi
+        n=$(( n + 1 ))
+    done
+    return 1
+}
+
+ac_online() {
+    local dir on
+    for dir in "$PSDIR"/*; do
+        rd "$dir/online" on
+        [[ $on == 1 ]] && return 0
+    done
+    return 1
+}
+
+find_battery || exit 0     
+
+rd "$BAT/status" status
+[[ -n $status ]] || status=Unknown
+
+rd "$BAT/energy_now" now
+if [[ $now =~ ^[0-9]+$ ]]; then unit=energy; else rd "$BAT/charge_now" now; unit=charge; fi
+rd "$BAT/${unit}_full" full
+rd "$BAT/${unit}_full_design" design
+
+rd "$BAT/capacity" cap
+if ! [[ $cap =~ ^[0-9]+$ ]]; then
+    if [[ $now =~ ^[0-9]+$ && $full =~ ^[0-9]+$ ]] && (( full > 0 )); then
+        cap=$(( now * 100 / full ))
+    else
+        printf 'Bat: N/D\nBat: N/D\n%s\n' "$NA_COLOR"
+        exit 0
+    fi
+fi
+(( cap > 100 )) && cap=100
+
+rate=0 power_uw=0
+if [[ $unit == energy ]]; then
+    rd "$BAT/power_now" rate
+    [[ $rate =~ ^-?[0-9]+$ ]] || rate=0
+    (( rate < 0 )) && rate=$(( -rate ))
+    power_uw=$rate
+else
+    rd "$BAT/current_now" rate
+    rd "$BAT/voltage_now" volt
+    [[ $rate =~ ^-?[0-9]+$ ]] || rate=0
+    (( rate < 0 )) && rate=$(( -rate ))
+    [[ $volt =~ ^[0-9]+$ ]] && power_uw=$(( rate * volt / 1000000 ))
+fi
+
+eta="" secs=0
+if (( rate > 0 )) && [[ $now =~ ^[0-9]+$ ]]; then
+    case $status in
+        Discharging) secs=$(( now * 3600 / rate )) ;;
+        Charging)    [[ $full =~ ^[0-9]+$ ]] && (( full > now )) \
+                         && secs=$(( (full - now) * 3600 / rate )) ;;
+    esac
+fi
+(( secs > 0 && secs < 360000 )) \
+    && printf -v eta '%02d:%02d' "$(( secs / 3600 ))" "$(( (secs % 3600) / 60 ))"
+
+case $status in
+    Discharging)          icon=$ICON_DISCHARGING ;;
+    Charging)             icon=$ICON_CHARGING ;;
+    Full|"Not charging")  icon=$ICON_PLUGGED ;;
+    *)  
+        if ac_online; then icon=$ICON_PLUGGED; else icon=$ICON_DISCHARGING; fi ;;
+esac
+
+color=$NORMAL_COLOR urgent=0
+if [[ $status == Discharging ]]; then
+    if   (( cap < CRIT_LEVEL )); then color=$CRIT_COLOR
+    elif (( cap < WARN_LEVEL )); then color=$WARN_COLOR
+    fi
+    (( cap < URGENT_LEVEL )) && urgent=1
+fi
+
+short="${LABEL}${cap}% ${icon}"
+full_text=$short
+[[ -n $eta ]] && full_text+=" ($eta)"
+printf '%s\n%s\n%s\n' "$full_text" "$short" "$color"
+
+if [[ ${BLOCK_BUTTON:-} == 1 ]]; then
+    POWER_PROFILE_SCRIPT="${HOME}/.config/i3/scripts/power-profile"
+
+    BATTERY_ETA="$eta" \
+    BATTERY_PERCENT="$cap" \
+    BATTERY_STATUS="$status" \
+    BATTERY_POWER_UW="$power_uw" \
+        "$POWER_PROFILE_SCRIPT" >/dev/null 2>&1 &
+fi
+
+(( urgent )) && exit 33
+exit 0

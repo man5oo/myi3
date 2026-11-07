@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+
+# myi3 di manuel - v1.0
+# Configuration (environment variables, set them in i3blocks.conf):
+#   T_WARN         warning level, °C                              (70)
+#   T_CRIT         critical level, °C                             (90)
+#   SENSOR_CHIP    hwmon chip to read, e.g. coretemp, k10temp, nvme.
+#                  lm_sensors names such as "coretemp-isa-0000" still work
+#                  (only the part before the first "-" is used).
+#                  Default: auto-detect the CPU sensor.
+#   SENSOR_INPUT   hwmon input file to read                       (temp1_input)
+#   DECIMALS       0 or 1 decimal digit shown in the bar          (0)
+#   LABEL          text/glyph shown before the value              (empty)
+#   WARN_COLOR     colour above T_WARN                            (#FDD663)
+#   CRIT_COLOR     colour above T_CRIT                            (#F28B82)
+#   NOTIFY         true/false: critical alerts and click info     (true)
+#   NOTIFY_REPEAT  seconds between repeated alerts while critical,
+#                  0 = alert only once per episode                (300)
+#   HYSTERESIS     degrees below T_CRIT before alerts re-arm      (5)
+#
+
+set -u
+
+SYSFS="${SYSFS:-/sys}"   
+
+T_WARN="${T_WARN:-70}"
+T_CRIT="${T_CRIT:-90}"
+SENSOR_CHIP="${SENSOR_CHIP:-}"
+SENSOR_INPUT="${SENSOR_INPUT:-temp1_input}"
+DECIMALS="${DECIMALS:-0}"
+LABEL="${LABEL:-}"
+WARN_COLOR="${WARN_COLOR:-#FDD663}"
+CRIT_COLOR="${CRIT_COLOR:-#F28B82}"
+NOTIFY="${NOTIFY:-true}"
+NOTIFY_REPEAT="${NOTIFY_REPEAT:-300}"
+HYSTERESIS="${HYSTERESIS:-5}"
+NA_COLOR="#9AA0A6"
+
+[[ $T_WARN =~ ^[0-9]+$ ]]        || T_WARN=70
+[[ $T_CRIT =~ ^[0-9]+$ ]]        || T_CRIT=90
+[[ $NOTIFY_REPEAT =~ ^[0-9]+$ ]] || NOTIFY_REPEAT=300
+[[ $HYSTERESIS =~ ^[0-9]+$ ]]    || HYSTERESIS=5
+[[ $DECIMALS == 1 ]]             || DECIMALS=0
+
+is_true() {
+    case "${1,,}" in 1|t|true|y|yes) return 0 ;; *) return 1 ;; esac
+}
+
+notify() {
+    is_true "$NOTIFY" || return 0
+    local urgency=$1 icon=$2 title=$3 body=${4:-}
+    if command -v dunstify >/dev/null 2>&1; then
+        dunstify -a temperature -u "$urgency" -i "$icon" \
+            -h string:x-dunst-stack-tag:temperature "$title" "$body"
+    elif command -v notify-send >/dev/null 2>&1; then
+        notify-send -a temperature -u "$urgency" -i "$icon" \
+            -h string:x-dunst-stack-tag:temperature "$title" "$body"
+    fi
+}
+
+SENSOR_FILE="" SENSOR_NAME=""
+
+find_sensor() {
+    local -a wanted
+    local auto=0 want dir name
+
+    if [[ -n $SENSOR_CHIP ]]; then
+        wanted=("${SENSOR_CHIP%%-*}")
+    else
+        auto=1
+        wanted=(coretemp k10temp zenpower k8temp cpu_thermal x86_pkg_temp acpitz)
+    fi
+
+    for want in "${wanted[@]}"; do
+        for dir in "$SYSFS"/class/hwmon/hwmon*; do
+            [[ -r $dir/name && -r $dir/$SENSOR_INPUT ]] || continue
+            read -r name < "$dir/name" || continue
+            if [[ $name == "$want" ]]; then
+                SENSOR_FILE=$dir/$SENSOR_INPUT SENSOR_NAME=$name
+                return 0
+            fi
+        done
+        for dir in "$SYSFS"/class/thermal/thermal_zone*; do
+            [[ -r $dir/type && -r $dir/temp ]] || continue
+            read -r name < "$dir/type" || continue
+            if [[ $name == "$want" ]]; then
+                SENSOR_FILE=$dir/temp SENSOR_NAME=$name
+                return 0
+            fi
+        done
+    done
+
+    if (( auto )); then
+        for dir in "$SYSFS"/class/thermal/thermal_zone*; do
+            [[ -r $dir/temp ]] || continue
+            { read -r name < "$dir/type"; } 2>/dev/null || name=thermal_zone
+            SENSOR_FILE=$dir/temp SENSOR_NAME=$name
+            return 0
+        done
+    fi
+    return 1
+}
+
+raw=""
+if find_sensor; then
+    { read -r raw < "$SENSOR_FILE"; } 2>/dev/null
+fi
+
+if ! [[ $raw =~ ^[0-9]+$ ]] || (( raw <= 0 || raw >= 200000 )); then
+    if [[ -n ${BLOCK_BUTTON:-} ]]; then
+        notify normal dialog-warning-symbolic "Temperature sensor not found" \
+            "Set SENSOR_CHIP in i3blocks.conf (see /sys/class/hwmon/*/name)."
+    fi
+    printf 'Temp: N/D\nTemp: N/D\n%s\n' "$NA_COLOR"
+    exit 0
+fi
+
+if (( DECIMALS )); then
+    printf -v text '%d.%d°C' "$(( raw / 1000 ))" "$(( (raw % 1000) / 100 ))"
+else
+    printf -v text '%d°C' "$(( (raw + 500) / 1000 ))"
+fi
+
+critical=0
+printf '%s%s\n%s%s\n' "$LABEL" "$text" "$LABEL" "$text"
+if (( raw >= T_CRIT * 1000 )); then
+    printf '%s\n' "$CRIT_COLOR"
+    critical=1
+elif (( raw >= T_WARN * 1000 )); then
+    printf '%s\n' "$WARN_COLOR"
+fi
+
+if [[ -n ${BLOCK_BUTTON:-} ]]; then
+    notify normal sensors-temperature-symbolic "CPU temperature: $text" \
+        "Sensor: $SENSOR_NAME \nwarning ${T_WARN}°C · critical ${T_CRIT}°C"
+fi
+
+STATE="${XDG_RUNTIME_DIR:-/tmp}/i3blocks-temperature.$UID"
+
+if (( critical )); then
+    last=""
+    [[ -r $STATE ]] && read -r last < "$STATE"
+    [[ $last =~ ^[0-9]+$ ]] || last=""
+    printf -v now '%(%s)T' -1
+    if [[ -z $last ]] || (( NOTIFY_REPEAT > 0 && now - last >= NOTIFY_REPEAT )); then
+        notify critical dialog-warning-symbolic \
+            "CPU temperature critical: $text" \
+            "Above the ${T_CRIT}°C limit. Check cooling and running processes."
+        printf '%s\n' "$now" > "$STATE"
+    fi
+elif (( raw < (T_CRIT - HYSTERESIS) * 1000 )); then
+    [[ -e $STATE ]] && rm -f "$STATE"
+fi
+
+(( critical )) && exit 33
+exit 0

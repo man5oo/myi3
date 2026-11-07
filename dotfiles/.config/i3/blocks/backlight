@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+# myi3 di manuel - v1.0
+
+set -u
+
+case "${BLOCK_BUTTON:-}" in
+  1) brightnessctl set +10% >/dev/null 2>&1 ;;
+  3) brightnessctl set 10%- >/dev/null 2>&1 ;;
+esac
+
+value=$(brightnessctl -m i 2>/dev/null | awk -F, '{gsub(/%/,"",$4); print $4; exit}')
+if [[ -z "$value" ]]; then
+  echo "N/D"
+  echo "N/D"
+  exit 0
+fi
+
+echo "${value}%"
+echo "${value}%"

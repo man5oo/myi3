@@ -1,0 +1,88 @@
+/* myi3 di manuel - v1.0*/
+
+@import "config.rasi"
+
+configuration {
+    modes: [drun, run];
+    show-icons:      true;
+    disable-history: false;
+    cycle:           true;
+    scroll-method:   1;
+    display-drun:        "󰀻  Apps";
+    display-run:         "   Run";
+    drun-display-format: "{name}";
+    run-command:         "{cmd}";
+    kb-mode-next:          "Control+Tab";
+    kb-mode-previous:      "Control+ISO_Left_Tab";
+    kb-row-left:           "Left";
+    kb-row-right:          "Right";
+    kb-move-char-back:     "Control+b";
+    kb-move-char-forward:  "Control+f";
+}
+
+mainbox {
+    orientation: vertical;
+    children:    [ mode-switcher, inputbar, listview ];
+}
+
+mode-switcher {
+	border: 0px;
+    orientation: horizontal;
+    spacing:     8px;
+    expand:      false;
+}
+
+button {
+    border:           2px 2px 6px 2px;
+    border-color:     @dark3;
+    border-radius:    0px;
+    padding:          8px 14px;
+    expand:           true;
+    horizontal-align: 0.5;
+    vertical-align: 0.5;
+}
+
+button.selected {
+    background-color: @charcoal;
+    text-color:       @lightblue;
+    border-color:     @dark3;
+}
+
+entry {
+    placeholder: "Search";
+}
+
+listview {
+    layout:        vertical;
+    flow:          horizontal;
+    columns:       6;
+    lines:         5;
+    dynamic:       true;
+    scrollbar:     false;
+}
+
+element {
+    orientation: vertical;
+    layout:      vertical;
+    padding:     10px 4px;
+    spacing:     8px;
+}
+
+element.selected.urgent {
+    border:       1px;
+    border-color: @red;
+}
+
+element-icon {
+    background-color: transparent;
+    size:             48px;
+    horizontal-align: 0.5;
+    vertical-align:   0.5;
+}
+
+element-text {
+    background-color: transparent;
+    horizontal-align: 0.5;
+    vertical-align:   0.5;
+    expand:           true;
+}

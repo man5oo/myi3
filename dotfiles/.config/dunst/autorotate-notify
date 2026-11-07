@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# myi3 di manuel - v1.0
+
+DAEMON="$HOME/.config/i3/scripts/autorotate"
+
+if pgrep -f "$DAEMON" >/dev/null 2>&1; then
+  ICON=rotation-allowed-symbolic
+  TEXT="Rotation Enabled"
+else
+  ICON=rotation-locked-symbolic
+  TEXT="Rotation Disabled"
+fi
+
+/usr/bin/dunstify -i "$ICON" "$TEXT"

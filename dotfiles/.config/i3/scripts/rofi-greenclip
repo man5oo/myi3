@@ -1,0 +1,5 @@
+#!/usr/bin/bash
+
+# myi3 di manuel - v1.0
+
+exec rofi -modi "clipboard:greenclip print" -show clipboard -theme "$HOME/.config/rofi/clip-menu.rasi"

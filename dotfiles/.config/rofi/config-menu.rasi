@@ -1,0 +1,17 @@
+/* ============================================================
+ * myi3 di manuel - v1.0
+ * ============================================================ */
+
+@import "config.rasi"
+
+window {
+	width: 400px;
+}
+
+entry {
+    placeholder: "Browse or search configurations";
+}
+
+listview {
+    lines: 15;
+}
