@@ -65,7 +65,7 @@ bindsym $mod+f fullscreen toggle
 bindsym $mod+h split h
 bindsym $mod+i exec sh $CONFIG/i3/scripts/launcher
 bindsym $mod+l exec sh $CONFIG/i3/scripts/i3lock
-bindsym $mod+m exec --no-startup-id wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle && $CONFIG/dunst/mic-notify
+bindsym $mod+m exec sh $CONFIG/i3/scripts/media-controller
 bindsym $mod+p focus parent
 bindsym $mod+q kill
 bindsym $mod+r mode "resize"
@@ -90,6 +90,7 @@ bindsym $mod+plus move scratchpad
 bindsym $mod+minus scratchpad show
 
 bindsym $mod+Shift+c reload
+bindsym $mod+Shift+m exec --no-startup-id wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle && $CONFIG/dunst/mic-notify
 bindsym $mod+Shift+r restart
 
 bindsym Mod1+Tab exec rofi -show window -config $CONFIG/rofi/window-switcher-menu.rasi
@@ -111,10 +112,11 @@ set $ws9 "9"
 assign [class="$BROWSER"] $ws8
 assign [title="$SYSTEM_MONITOR"] $ws9
 
+for_window [title="$SYSTEM_MONITOR"] focus
 for_window [urgent=latest] focus
 for_window [class="Blueman-manager"] floating enable
 for_window [class="Nm-connection-editor"] floating enable
-for_window [class="Alacritty"] floating enable, resize set 800 600, move position center
+for_window [class="Alacritty"] floating enable, resize set 900 700, move position center
 for_window [class="feh"] floating enable, resize set 1600 1000, move position center
 
 bindsym $mod+1 workspace $ws1

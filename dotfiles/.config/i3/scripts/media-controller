@@ -1,0 +1,339 @@
+#!/usr/bin/env bash
+
+# ============================================================
+# Configuration
+# ============================================================
+
+THEME="$HOME/.config/rofi/media-controller.rasi"
+
+# Player priority: first entry has highest priority.
+# Players not listed here are added automatically.
+PLAYER_PRIORITY=(
+    "spotify"
+    "firefox"
+    "vlc"
+)
+
+# Window class associated with each player.
+declare -A WINDOW_CLASS_MAP=(
+    [spotify]="spotify"
+    [firefox]="firefox"
+    [vlc]="vlc"
+)
+
+# Menu icons (Nerd Font)
+ICON_PREVIOUS="󰒮"
+ICON_PLAY_PAUSE="󰐊"
+ICON_NEXT="󰒭"
+ICON_STOP="󰓛"
+ICON_FOCUS="󰍉"
+
+# ============================================================
+# Menu
+# ============================================================
+
+OPTIONS=(
+    "$ICON_PREVIOUS  Previous"
+    "$ICON_PLAY_PAUSE  Play / Pause"
+    "$ICON_NEXT  Next"
+    "$ICON_STOP  Stop"
+    "$ICON_FOCUS  Focus window"
+)
+
+# ============================================================
+# Dependencies
+# ============================================================
+
+if ! command -v rofi >/dev/null 2>&1; then
+    notify-send "Media control" "Rofi is not installed."
+    exit 1
+fi
+
+# ============================================================
+# Helpers
+# ============================================================
+
+escape_markup() {
+    sed -e 's/\&/\&amp;/g' \
+        -e 's/</\&lt;/g' \
+        -e 's/>/\&gt;/g'
+}
+
+format_time() {
+    local seconds="${1%%.*}"
+
+    [[ "$seconds" =~ ^[0-9]+$ ]] || return 0
+
+    printf '%d:%02d' \
+        "$((seconds / 60))" \
+        "$((seconds % 60))"
+}
+
+get_players() {
+    local player preferred
+    local -a available=()
+
+    PLAYERS=()
+
+    command -v playerctl >/dev/null 2>&1 || return 0
+
+    mapfile -t available < <(playerctl -l 2>/dev/null)
+
+    declare -A added=()
+
+    # Add players following configured priority.
+    for preferred in "${PLAYER_PRIORITY[@]}"; do
+        for player in "${available[@]}"; do
+            [[ -n "$player" ]] || continue
+
+            if [[ "$player" == "$preferred" ||
+                  "$player" == "$preferred".* ]]; then
+
+                if [[ -z "${added[$player]+x}" ]]; then
+                    PLAYERS+=("$player")
+                    added["$player"]=1
+                fi
+            fi
+        done
+    done
+
+    # Add remaining players.
+    for player in "${available[@]}"; do
+        [[ -n "$player" ]] || continue
+
+        if [[ -z "${added[$player]+x}" ]]; then
+            PLAYERS+=("$player")
+            added["$player"]=1
+        fi
+    done
+}
+
+get_player_status() {
+    playerctl --player="$1" status 2>/dev/null || true
+}
+
+select_player() {
+    local player status
+
+    CURRENT_PLAYER=""
+
+    # Prefer a playing player.
+    for player in "${PLAYERS[@]}"; do
+        status="$(get_player_status "$player")"
+
+        if [[ "$status" == "Playing" ]]; then
+            CURRENT_PLAYER="$player"
+            return
+        fi
+    done
+
+    # If none is playing, prefer a paused player.
+    for player in "${PLAYERS[@]}"; do
+        status="$(get_player_status "$player")"
+
+        if [[ "$status" == "Paused" ]]; then
+            CURRENT_PLAYER="$player"
+            return
+        fi
+    done
+
+    # Otherwise use the first available player.
+    CURRENT_PLAYER="${PLAYERS[0]:-}"
+}
+
+# ============================================================
+# Media information
+# ============================================================
+
+build_message() {
+    local title artist album status
+    local position duration position_text duration_text
+    local base_message
+
+    MESSAGE=""
+
+    if ! command -v playerctl >/dev/null 2>&1; then
+        MESSAGE="playerctl is not installed."
+        return
+    fi
+
+    if [[ -z "$CURRENT_PLAYER" ]]; then
+        MESSAGE="No media player available."
+        return
+    fi
+
+    status="$(get_player_status "$CURRENT_PLAYER")"
+
+    title="$(playerctl --player="$CURRENT_PLAYER" metadata xesam:title 2>/dev/null || true)"
+    artist="$(playerctl --player="$CURRENT_PLAYER" metadata xesam:artist 2>/dev/null || true)"
+    album="$(playerctl --player="$CURRENT_PLAYER" metadata xesam:album 2>/dev/null || true)"
+
+    position="$(playerctl --player="$CURRENT_PLAYER" position 2>/dev/null || true)"
+    duration="$(playerctl --player="$CURRENT_PLAYER" metadata mpris:length 2>/dev/null || true)"
+
+    title="$(printf '%s' "${title:-Unknown title}" | escape_markup)"
+    artist="$(printf '%s' "${artist:-Unknown artist}" | escape_markup)"
+    album="$(printf '%s' "${album:-}" | escape_markup)"
+
+    position_text="$(format_time "$position")"
+
+    if [[ "$duration" =~ ^[0-9]+$ ]]; then
+        duration_text="$(format_time "$((duration / 1000000))")"
+    else
+        duration_text=""
+    fi
+
+    base_message="<b>${title}</b>"
+
+    [[ -n "$artist" ]] && base_message+="<br/>${artist}"
+    [[ -n "$album" ]] && base_message+="<br/><i>${album}</i>"
+
+    MESSAGE="<b>${status:-Unknown status}</b><br/>${base_message}"
+
+    if [[ -n "$position_text" && -n "$duration_text" ]]; then
+        MESSAGE+="<br/>${position_text} / ${duration_text}"
+    fi
+}
+
+# ============================================================
+# Focus player window
+# ============================================================
+
+focus_window() {
+    local player base class tree window_id
+
+    if ! command -v i3-msg >/dev/null 2>&1 ||
+       ! command -v jq >/dev/null 2>&1; then
+        NOTICE="i3-msg or jq is not installed."
+        return 1
+    fi
+
+    player="$CURRENT_PLAYER"
+    base="${player#org.mpris.MediaPlayer2.}"
+    base="${base%%.*}"
+    base="${base,,}"
+
+    class="${WINDOW_CLASS_MAP[$base]:-$base}"
+
+    tree="$(i3-msg -t get_tree 2>/dev/null)" || {
+        NOTICE="Unable to read the i3 window tree."
+        return 1
+    }
+
+    window_id="$(
+        jq -r --arg class "${class,,}" '
+            [
+                .. | objects
+                | select((.window? // 0) != 0)
+                | select(
+                    [
+                        .window_properties.class // "",
+                        .window_properties.instance // "",
+                        .app_id // ""
+                    ]
+                    | map(ascii_downcase)
+                    | any(. == $class)
+                )
+            ]
+            | sort_by(.focused == true)
+            | reverse
+            | .[0].id // empty
+        ' <<< "$tree"
+    )"
+
+    if [[ -z "$window_id" ]]; then
+        NOTICE="No matching window found for ${class}."
+        return 1
+    fi
+
+    i3-msg "[con_id=${window_id}] focus" >/dev/null 2>&1 || {
+        NOTICE="Unable to focus the player window."
+        return 1
+    }
+
+    return 0
+}
+
+# ============================================================
+# Rofi
+# ============================================================
+
+show_menu() {
+    local -a rofi_args
+
+    rofi_args=(
+        -dmenu
+        -i
+        -p "Media control"
+        -mesg "$MESSAGE"
+        -format i
+    )
+
+    [[ -n "$THEME" ]] && rofi_args+=(-theme "$THEME")
+
+    printf '%s\n' "${OPTIONS[@]}" |
+        rofi "${rofi_args[@]}"
+}
+
+# ============================================================
+# Main
+# ============================================================
+
+NOTICE=""
+
+while true; do
+
+    get_players
+    select_player
+    build_message
+
+    # Keep notices visible alongside the media information.
+    if [[ -n "$NOTICE" ]]; then
+        MESSAGE+="<br/><br/><i>${NOTICE}</i>"
+    fi
+
+    selection="$(show_menu)" || exit 0
+
+    # The previous notice has now been displayed.
+    NOTICE=""
+
+    # No player: keep the menu open and explain why
+    # the selected action cannot be performed.
+    if [[ -z "$CURRENT_PLAYER" ]]; then
+        NOTICE="No media player available."
+        continue
+    fi
+
+    case "$selection" in
+        0)
+            playerctl --player="$CURRENT_PLAYER" previous 2>/dev/null ||
+                NOTICE="Previous command failed."
+            ;;
+
+        1)
+            playerctl --player="$CURRENT_PLAYER" play-pause 2>/dev/null ||
+                NOTICE="Play / Pause command failed."
+            ;;
+
+        2)
+            playerctl --player="$CURRENT_PLAYER" next 2>/dev/null ||
+                NOTICE="Next command failed."
+            ;;
+
+        3)
+            playerctl --player="$CURRENT_PLAYER" stop 2>/dev/null ||
+                NOTICE="Stop command failed."
+            ;;
+
+        4)
+            if focus_window; then
+                exit 0
+            fi
+            ;;
+
+        *)
+            exit 0
+            ;;
+    esac
+
+done

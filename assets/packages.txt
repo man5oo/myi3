@@ -70,6 +70,7 @@ upower
 wireplumber
 woff2-font-awesome
 wpa_supplicant
+xapp
 xarchiver
 xclip
 xorg-server
