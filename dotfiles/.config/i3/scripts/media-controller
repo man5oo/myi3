@@ -22,11 +22,11 @@ declare -A WINDOW_CLASS_MAP=(
 )
 
 # Menu icons (Nerd Font)
-ICON_PREVIOUS="󰒮"
-ICON_PLAY_PAUSE="󰐊"
-ICON_NEXT="󰒭"
-ICON_STOP="󰓛"
-ICON_FOCUS="󰍉"
+ICON_PREVIOUS="󰒮 "
+ICON_PLAY_PAUSE="󰐎 "
+ICON_NEXT="󰒭 "
+ICON_STOP="󰓛 "
+ICON_FOCUS="󰏌 "
 
 # ============================================================
 # Menu
@@ -37,7 +37,7 @@ OPTIONS=(
     "$ICON_PLAY_PAUSE  Play / Pause"
     "$ICON_NEXT  Next"
     "$ICON_STOP  Stop"
-    "$ICON_FOCUS  Focus window"
+    "$ICON_FOCUS  Open Media Player"
 )
 
 # ============================================================
@@ -158,7 +158,7 @@ build_message() {
     fi
 
     if [[ -z "$CURRENT_PLAYER" ]]; then
-        MESSAGE="No media player available."
+        MESSAGE="No media playing"
         return
     fi
 
