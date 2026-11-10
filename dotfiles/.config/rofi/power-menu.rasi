@@ -1,6 +1,4 @@
-/* ============================================================
- * myi3 di manuel - v1.0
- * ============================================================ */
+/* Power menu: list only, docked on the right edge */
 
 @import "config.rasi"
 
@@ -17,6 +15,6 @@ entry {
 }
 
 listview {
-    lines: 6;
+    lines: 5;
     scrollbar:     false;
 }

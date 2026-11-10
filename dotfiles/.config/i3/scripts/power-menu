@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-# myi3 di manuel - v1.0
-
 ROFI_OPTIONS=(-dmenu -i -theme "$HOME/.config/rofi/power-menu.rasi")
 
 enable_confirmation=true
@@ -41,9 +39,9 @@ entries=(
   "󰤄   Suspend|confirm|systemctl suspend"
   "   Lock||$HOME/.config/i3/scripts/i3lock"
   "   Logout|confirm|i3-msg exit"
-  "   Cancel||"
 )
 
+# Split entry $1 into $label, $confirm and $cmd
 parse_entry() {
   IFS='|' read -r label confirm cmd <<< "${entries[$1]}"
 }
@@ -64,13 +62,14 @@ ask_confirmation() {
   [[ "${answer}" == 0 ]] && run_command
 }
 
+# Show only the labels; rofi returns the 0-based index of the selected row.
 index=$(for entry in "${entries[@]}"; do printf '%s\n' "${entry%%|*}"; done \
   | rofi "${ROFI_OPTIONS[@]}" -p "Power" -format i)
 
-[[ -n "${index}" ]] || exit 0  
+[[ -n "${index}" ]] || exit 0   # Esc
 
 parse_entry "${index}"
-[[ -n "${cmd}" ]] || exit 0     
+[[ -n "${cmd}" ]] || exit 0     # Cancel
 
 if [[ "${enable_confirmation}" == true && -n "${confirm}" ]]; then
   ask_confirmation

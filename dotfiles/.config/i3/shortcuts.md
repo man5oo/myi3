@@ -7,7 +7,7 @@ MOD+F				Layout Fullscreen
 MOD+H				Spli Horizontally
 MOD+I				Launcher
 MOD+L				Lock Screen
-MOD+M				Mute Microphone
+MOD+M				Media Controller
 MOD+P				Focus Parent
 MOD+Q				Close Window
 MOD+R				Mode Resize
@@ -15,7 +15,6 @@ MOD+S				Sticky Window
 MOD+T				Toggle Touchscreen
 MOD+V				Split Vertically
 MOD+W				Wallpaper Selector
-MOD+Z				Launch System Monitor (htop)
 
 MOD+Tab				Workspace Next
 Print 				Screenshot Menu
@@ -32,6 +31,7 @@ MOD+Minus			Show Scratchpad
 
 MOD+Shift+C 			Reload i3
 MOD+Shift+G			Resize Gapps
+MOD+Shift+M			Mute Microphone
 MOD+Shift+R 			Restart i3
 
 MOD+Shift+Tab			Window Switcher

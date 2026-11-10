@@ -110,9 +110,8 @@ set $ws8 "8"
 set $ws9 "9"
 
 assign [class="$BROWSER"] $ws8
-assign [title="$SYSTEM_MONITOR"] $ws9
+assign [class="vlc"] $ws9
 
-for_window [title="$SYSTEM_MONITOR"] focus
 for_window [urgent=latest] focus
 for_window [class="Blueman-manager"] floating enable
 for_window [class="Nm-connection-editor"] floating enable
