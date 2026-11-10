@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-# myi3 di manuel - v1.0
-
 set -uo pipefail
 
 # ============================================================
@@ -81,6 +79,7 @@ get_file_glyph() {
 
 # ------------------------------------------------------------
 # ROFI MENU
+# Returns the selected entry index in ROFI_INDEX.
 # ------------------------------------------------------------
 
 show_menu() {
@@ -162,18 +161,21 @@ browse_directory() {
     local item name glyph
     local index relative
 
+    # Parent directory
     if [[ "$current_dir" != "$CONFIG_DIR" ]]; then
         labels+=("$GLYPH_PARENT  ..")
         paths+=("$(dirname "$current_dir")")
         types+=("parent")
     fi
 
+    # Global search
     if [[ "$current_dir" == "$CONFIG_DIR" ]]; then
         labels+=("$LABEL_SEARCH")
         paths+=("")
         types+=("search")
     fi
 
+    # Directories first
     while IFS= read -r -d '' item; do
         name="${item##*/}"
 
@@ -187,6 +189,7 @@ browse_directory() {
             LC_ALL=C sort -z
     )
 
+    # Files
     while IFS= read -r -d '' item; do
         name="${item##*/}"
         glyph=$(get_file_glyph "$name")
@@ -204,7 +207,9 @@ browse_directory() {
     relative="${current_dir#"$CONFIG_DIR"}"
     [[ -n "$relative" ]] || relative="/"
 
+    # Show menu
     if ! show_menu "CONFIG $relative" "${labels[@]}"; then
+        # Escape: go to parent, or exit at root
         if [[ "$current_dir" != "$CONFIG_DIR" ]]; then
             CURRENT_DIR="$(dirname "$current_dir")"
             return 0
@@ -215,6 +220,7 @@ browse_directory() {
 
     index="$ROFI_INDEX"
 
+    # Validate index
     ((index < ${#labels[@]})) || return 0
 
     case "${types[index]}" in

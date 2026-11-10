@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 
-# myi3 di manuel - v1.0
-
 set -u
+
+# ============================================================
+# CONFIGURATION
+# ============================================================
 
 SCREENSHOT_DIR="$HOME/Pictures/Screenshots"
 ROFI_THEME="$HOME/.config/rofi/screenshot.rasi"
@@ -11,6 +13,12 @@ SCROT="scrot"
 ROFI="rofi"
 
 ROFI_CLOSE_DELAY="0.3"
+
+# ------------------------------------------------------------
+# MENU LABELS
+# Customize these labels freely (including Nerd Font glyphs).
+# Do NOT change the internal mode values.
+# ------------------------------------------------------------
 
 LABEL_FULLSCREEN="   Full screen"
 LABEL_ACTIVE_WINDOW="󰖯   Active window"
@@ -22,6 +30,10 @@ LABEL_DELAYED="󰔛   Delayed capture"
 LABEL_DELAY_3="3 seconds"
 LABEL_DELAY_5="5 seconds"
 LABEL_DELAY_10="10 seconds"
+
+# ============================================================
+# FUNCTIONS
+# ============================================================
 
 notify() {
     local title="$1"
@@ -114,6 +126,10 @@ capture() {
         return 1
     fi
 }
+
+# ============================================================
+# MAIN MENU
+# ============================================================
 
 choice=$(show_menu "Screenshot" \
     "$LABEL_FULLSCREEN" \

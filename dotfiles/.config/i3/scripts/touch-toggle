@@ -1,7 +1,5 @@
 #!/bin/sh
-
-# myi3 di manuel - v1.0
-
+# Toggle the touchscreen on/off and show a notification.
 name="${TOUCHSCREEN_DEVICE:-ELAN Touchscreen}"
 id=$(xinput list --id-only "$name" 2>/dev/null) || exit 1
 

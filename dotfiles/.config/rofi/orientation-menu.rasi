@@ -1,0 +1,20 @@
+/* Power profile selector: battery information + profile list */
+
+@import "config.rasi"
+
+inputbar {
+    enabled: false;
+}
+
+window {
+    width: 400px;
+}
+
+mainbox {
+    children: [ message, listview ];
+}
+
+listview {
+    lines: 4;
+    scrollbar: false;
+}

@@ -1,7 +1,6 @@
 #!/bin/sh
-
-# myi3 di manuel - v1.0
-
+# Apply the wallpaper. Usage: set-wallpaper [file]
+# With no argument, uses the one saved by rofi-wall, or the default below.
 state="${XDG_STATE_HOME:-$HOME/.local/state}/i3/wallpaper"
 default="$HOME/Pictures/Wallpapers/wall-3.png"
 
@@ -12,4 +11,8 @@ elif [ -r "$state" ]; then
 fi
 
 [ -f "$wall" ] || wall=$default
+	if [ -n "$1" ]; then
+		mkdir -p "${state%/*}"
+		printf '%s\n' "$1" > "$state"
+	fi
 exec feh --bg-fill "$wall"

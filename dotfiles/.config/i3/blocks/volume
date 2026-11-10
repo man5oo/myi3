@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 
-# myi3 di manuel - v1.0
-
 SINK="@DEFAULT_AUDIO_SINK@"
 STEP="${STEP:-5%}"
 
 case $BLOCK_BUTTON in
-  3) wpctl set-mute $SINK toggle ;;           
-  4) wpctl set-volume $SINK ${STEP}+ ;;         
-  5) wpctl set-volume $SINK ${STEP}- ;;        
+  3) wpctl set-mute $SINK toggle ;;            # right click, mute/unmute
+  4) wpctl set-volume $SINK ${STEP}+ ;;         # scroll up, increase
+  5) wpctl set-volume $SINK ${STEP}- ;;         # scroll down, decrease
 esac
 
 status=$(wpctl get-volume $SINK)

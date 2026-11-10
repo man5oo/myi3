@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
-
-# myi3 di manuel - v1.0
+# wallpaper-picker — scegli lo sfondo da una griglia di anteprime in rofi.
+#
+# Le anteprime sono miniature 16:9 generate una volta sola in
+# ~/.cache/rofi-wallpaper-thumbs (rigenerate se l'originale cambia):
+# rofi non deve decodificare ogni volta immagini a piena risoluzione.
+#
+# Variabili:  WALLPAPER_DIR   cartella degli sfondi (default ~/Pictures/Wallpapers)
+#             THUMB_W, THUMB_H  dimensione miniature (default 320x180, 16:9; con
+#                               280x280 il riquadro si riempie ritagliando al centro)
+# Richiede:   rofi, feh, ImageMagick (magick o convert)
 
 WALL_DIR="${WALLPAPER_DIR:-$HOME/Pictures/Wallpapers}"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/rofi-wallpaper-thumbs"
@@ -11,6 +19,9 @@ im=$(command -v magick || command -v convert) || { echo "ImageMagick not found" 
 [[ -d $WALL_DIR ]] || { echo "Folder not found: $WALL_DIR" >&2; exit 1; }
 mkdir -p "$CACHE_DIR"
 
+# Un solo giro sulla cartella: l'ordine resta alfabetico su tutti i formati
+# (con un glob a parentesi graffe elencherebbe prima tutti i .jpg, poi i .png),
+# e l'estensione è confrontata senza distinguere maiuscole (.JPG, .Png...).
 shopt -s nullglob
 images=()
 for f in "$WALL_DIR"/*; do
@@ -18,6 +29,9 @@ for f in "$WALL_DIR"/*; do
 done
 (( ${#images[@]} )) || { echo "No wallpaper was found in $WALL_DIR" >&2; exit 1; }
 
+# Righe per rofi: testo, poi l'icona (qui un file immagine) con la sintassi
+# "testo \0 icon \x1f percorso". L'estensione resta nel nome della miniatura
+# così wall.jpg e wall.png non si scontrano.
 choice=$(
   for img in "${images[@]}"; do
     name=${img##*/}
@@ -30,6 +44,7 @@ choice=$(
   done | rofi -dmenu -i -no-custom -show-icons -p "Wallpaper:" -theme "$THEME"
 )
 
+# -no-custom impedisce il testo libero; il controllo su "/" è una rete di sicurezza.
 [[ -n $choice && $choice != */* && -f $WALL_DIR/$choice ]] || exit 0
-feh --bg-fill "$WALL_DIR/$choice"
+"$HOME/.config/i3/scripts/set-wallpaper" "$WALL_DIR/$choice"
 dunstify "Wallpaper changed" "${choice}" -i "preferences-wallpaper"

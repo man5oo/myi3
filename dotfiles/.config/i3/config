@@ -9,13 +9,13 @@ set $EDITOR geany
 set $SYSTEM_MONITOR htop
 
 exec --no-startup-id xrandr --output eDP-1 --mode 1920x1080 --rate 60
+exec --no-startup-id dunst
 exec --no-startup-id xdg-user-dirs-update
 exec --no-startup-id picom
 exec --no-startup-id xss-lock --transfer-sleep-lock -- $CONFIG/i3/scripts/i3lock
 exec --no-startup-id nm-applet
 exec --no-startup-id blueman-applet
 exec --no-startup-id $CONFIG/i3/scripts/set-wallpaper
-exec --no-startup-id dunst
 exec --no-startup-id xinput disable "ELAN Touchscreen"
 exec --no-startup-id thunar --daemon
 exec --no-startup-id greenclip daemon
@@ -73,7 +73,7 @@ bindsym $mod+s sticky toggle
 bindsym $mod+t exec --no-startup-id sh $CONFIG/i3/scripts/touch-toggle
 bindsym $mod+v split v
 bindsym $mod+w exec --no-startup-id sh $CONFIG/i3/scripts/rofi-wall
-bindsym $mod+y exec --no-startup-id sh $CONFIG/i3/scripts/autorotate-toggle toggle && $CONFIG/dunst/autorotate-notify
+bindsym $mod+y exec --no-startup-id sh $CONFIG/i3/scripts/orientation
 bindsym $mod+z exec --no-startup-id $TERMINAL -t htop -e htop
 
 bindsym $mod+Tab workspace next

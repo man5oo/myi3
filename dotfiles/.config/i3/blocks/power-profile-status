@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+if ! command -v powerprofilesctl >/dev/null 2>&1; then
+    echo "N/D"
+    echo "N/D"
+    exit 0
+fi
+
+current=$(powerprofilesctl get 2>/dev/null)
+
+case "$BLOCK_BUTTON" in
+    1)
+        case "$current" in
+            power-saver) next=balanced ;;
+            balanced)    next=performance ;;
+            *)           next=power-saver ;;
+        esac
+        powerprofilesctl set "$next"
+        dunstify "$next"
+        current="$next"
+        ;;
+esac
+
+case "$current" in
+    power-saver)  icon="" ;;
+    performance)  icon="" ;;
+    *)            icon="" ;;
+esac
+
+echo "$icon"
+echo "$icon"

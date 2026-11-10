@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-# myi3 di manuel - v1.0
-
 set -u
 
 ROFI_THEME="${HOME}/.config/rofi/power-profiles-menu.rasi"

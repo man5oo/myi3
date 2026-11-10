@@ -1,7 +1,5 @@
 #!/usr/bin/env sh
 
-# myi3 di manuel - v1.0
-
 TYPE="${BLOCK_INSTANCE:-mem}"
 PERCENT="${PERCENT:-true}"
 

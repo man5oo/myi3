@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
-
-# myi3 di manuel - v1.0
+# temperature — i3blocks block showing the CPU temperature.
+#
+# Reads the kernel's sysfs interface directly (no `sensors`, no lm_sensors,
+# no subprocess on the normal path). Prints the usual three i3blocks lines
+# (full text, short text, colour) and exits 33 ("urgent") at or above T_CRIT.
+#
+# Click:  shows the current reading (sensor, warn/critical levels) as a
+#         desktop notification.
+# Alert:  when the temperature reaches T_CRIT a critical notification is sent
+#         once. Alerts re-arm after it drops HYSTERESIS degrees below T_CRIT,
+#         and can repeat every NOTIFY_REPEAT seconds while it stays critical.
+#
 # Configuration (environment variables, set them in i3blocks.conf):
 #   T_WARN         warning level, °C                              (70)
 #   T_CRIT         critical level, °C                             (90)
@@ -18,10 +28,14 @@
 #                  0 = alert only once per episode                (300)
 #   HYSTERESIS     degrees below T_CRIT before alerts re-arm      (5)
 #
+# To list the sensors on a machine:
+#   for d in /sys/class/hwmon/hwmon*; do echo "$d $(cat $d/name)"; done
+#
+# Optional: dunst (dunstify) or libnotify (notify-send) for notifications.
 
 set -u
 
-SYSFS="${SYSFS:-/sys}"   
+SYSFS="${SYSFS:-/sys}"   # overridable only to test against a fake tree
 
 T_WARN="${T_WARN:-70}"
 T_CRIT="${T_CRIT:-90}"
@@ -36,6 +50,7 @@ NOTIFY_REPEAT="${NOTIFY_REPEAT:-300}"
 HYSTERESIS="${HYSTERESIS:-5}"
 NA_COLOR="#9AA0A6"
 
+# Fall back to the defaults on anything that is not a plain integer.
 [[ $T_WARN =~ ^[0-9]+$ ]]        || T_WARN=70
 [[ $T_CRIT =~ ^[0-9]+$ ]]        || T_CRIT=90
 [[ $NOTIFY_REPEAT =~ ^[0-9]+$ ]] || NOTIFY_REPEAT=300
@@ -46,6 +61,8 @@ is_true() {
     case "${1,,}" in 1|t|true|y|yes) return 0 ;; *) return 1 ;; esac
 }
 
+# notify <urgency> <icon> <title> [body]
+# The stack tag makes each notification replace the previous one.
 notify() {
     is_true "$NOTIFY" || return 0
     local urgency=$1 icon=$2 title=$3 body=${4:-}
@@ -58,6 +75,9 @@ notify() {
     fi
 }
 
+# ── Find the sensor ──────────────────────────────────────────────────
+# Sets SENSOR_FILE (a sysfs file holding millidegrees) and SENSOR_NAME.
+
 SENSOR_FILE="" SENSOR_NAME=""
 
 find_sensor() {
@@ -68,6 +88,7 @@ find_sensor() {
         wanted=("${SENSOR_CHIP%%-*}")
     else
         auto=1
+        # Intel, AMD (x3), ARM, Intel package thermal zone, ACPI as a last resort.
         wanted=(coretemp k10temp zenpower k8temp cpu_thermal x86_pkg_temp acpitz)
     fi
 
@@ -90,6 +111,7 @@ find_sensor() {
         done
     done
 
+    # Auto mode only: take any thermal zone rather than show nothing.
     if (( auto )); then
         for dir in "$SYSFS"/class/thermal/thermal_zone*; do
             [[ -r $dir/temp ]] || continue
@@ -101,11 +123,14 @@ find_sensor() {
     return 1
 }
 
+# ── Read it ──────────────────────────────────────────────────────────
+
 raw=""
 if find_sensor; then
     { read -r raw < "$SENSOR_FILE"; } 2>/dev/null
 fi
 
+# Plausible range only: a sensor that is not ready reports 0 or garbage.
 if ! [[ $raw =~ ^[0-9]+$ ]] || (( raw <= 0 || raw >= 200000 )); then
     if [[ -n ${BLOCK_BUTTON:-} ]]; then
         notify normal dialog-warning-symbolic "Temperature sensor not found" \
@@ -121,6 +146,8 @@ else
     printf -v text '%d°C' "$(( (raw + 500) / 1000 ))"
 fi
 
+# ── Output ───────────────────────────────────────────────────────────
+
 critical=0
 printf '%s%s\n%s%s\n' "$LABEL" "$text" "$LABEL" "$text"
 if (( raw >= T_CRIT * 1000 )); then
@@ -129,6 +156,8 @@ if (( raw >= T_CRIT * 1000 )); then
 elif (( raw >= T_WARN * 1000 )); then
     printf '%s\n' "$WARN_COLOR"
 fi
+
+# ── Notifications ────────────────────────────────────────────────────
 
 if [[ -n ${BLOCK_BUTTON:-} ]]; then
     notify normal sensors-temperature-symbolic "CPU temperature: $text" \
@@ -149,8 +178,10 @@ if (( critical )); then
         printf '%s\n' "$now" > "$STATE"
     fi
 elif (( raw < (T_CRIT - HYSTERESIS) * 1000 )); then
+    # Cooled down enough: re-arm the alert for the next episode.
     [[ -e $STATE ]] && rm -f "$STATE"
 fi
 
+# Exit code 33 makes i3blocks flag the block as urgent.
 (( critical )) && exit 33
 exit 0

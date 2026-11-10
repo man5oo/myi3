@@ -27,9 +27,11 @@ i3-wm
 i3blocks
 i3status
 iio-sensor-proxy
+imagemagick
 intel-gpu-tools
 intel-ucode
 iw
+jq
 less
 libpulse
 maim
@@ -51,6 +53,7 @@ pipewire-pulse
 playerctl
 polkit-gnome
 power-profiles-daemon
+psmisc
 reflector
 ristretto
 rofi
@@ -73,6 +76,7 @@ wpa_supplicant
 xapp
 xarchiver
 xclip
+xdg-user-dirs
 xorg-server
 xorg-xinit
 xorg-xinput

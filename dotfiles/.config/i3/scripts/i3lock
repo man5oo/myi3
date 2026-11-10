@@ -1,6 +1,4 @@
-#!/bin/sh
-
-# myi3 di manuel - v1.0
+#!/bin/bash
 
 BLANK='#00000000'
 CLEAR='#ffffff22'
@@ -9,38 +7,63 @@ TEXT='#8AB4F8'
 WRONG='#F28B82'
 VERIFYING='#8AB4F8'
 
-i3lock \
---nofork \
---insidever-color=$CLEAR     \
---ringver-color=$VERIFYING   \
-\
---pass-volume-keys \
---pass-screen-keys \
---pass-media-keys \
-\
---insidewrong-color=$CLEAR   \
---ringwrong-color=$WRONG     \
-\
---inside-color=$BLANK        \
---ring-color=$DEFAULT        \
---line-color=$BLANK          \
---separator-color=$DEFAULT   \
---ring-width=3.0	     \
---radius=160		     \
-\
---verif-color=$TEXT          \
---verif-text="Verifyng.." \
---wrong-color=$WRONG          \
---wrong-text="Wrong" \
---time-color=$TEXT           \
---date-color=$TEXT           \
---layout-color=$TEXT         \
---keyhl-color=$WRONG         \
---bshl-color=$WRONG          \
-\
---blur 8                     \
---clock                      \
---indicator                  \
---time-str="%H:%M"        \
---time-size=56		\
---date-str="%A, %b %d"       
+LOCK_OPTIONS=(
+    --insidever-color="$CLEAR"
+    --ringver-color="$VERIFYING"
+
+    --pass-volume-keys
+    --pass-screen-keys
+    --pass-media-keys
+
+    --insidewrong-color="$CLEAR"
+    --ringwrong-color="$WRONG"
+
+    --inside-color="$BLANK"
+    --ring-color="$DEFAULT"
+    --line-color="$BLANK"
+    --separator-color="$DEFAULT"
+    --ring-width=3.0
+    --radius=160
+
+    --verif-color="$TEXT"
+    --verif-text="Verifying.."
+    --wrong-color="$WRONG"
+    --wrong-text="Wrong"
+    --time-color="$TEXT"
+    --date-color="$TEXT"
+    --layout-color="$TEXT"
+    --keyhl-color="$WRONG"
+    --bshl-color="$WRONG"
+
+    --blur=8
+    --clock
+    --indicator
+    --time-str="%H:%M"
+    --time-size=56
+    --date-str="%A, %b %d"
+)
+
+# Sleep lock transferred by xss-lock
+if [[ -e "/dev/fd/${XSS_SLEEP_LOCK_FD:--1}" ]]; then
+
+    kill_i3lock() {
+        pkill -xu "$EUID" "$@" i3lock
+    }
+
+    trap 'kill_i3lock' TERM INT
+
+    # Start i3lock in daemon mode without inheriting the sleep lock
+    i3lock -d "${LOCK_OPTIONS[@]}" {XSS_SLEEP_LOCK_FD}<&-
+
+    # Release the sleep lock: systemd can now suspend
+    exec {XSS_SLEEP_LOCK_FD}<&-
+
+    # Keep this wrapper alive until i3lock exits
+    while kill_i3lock -0; do
+        sleep 0.5
+    done
+
+else
+    # Manual lock: remain in foreground
+    exec i3lock -n "${LOCK_OPTIONS[@]}"
+fi

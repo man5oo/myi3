@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# myi3 di manuel - v1.0
+# arch_update — i3blocks block showing pending Arch Linux updates.
 #
 # Configuration (environment variables, set them in i3blocks.conf):
 #   LABEL          text/glyph shown before the count          (empty)
@@ -33,6 +33,7 @@ is_true() {
     case "${1,,}" in 1|t|true|y|yes) return 0 ;; *) return 1 ;; esac
 }
 
+# Notify only on click (default), on every run, or never.
 want_notify() {
     case "$NOTIFY" in
         always) return 0 ;;
@@ -41,6 +42,9 @@ want_notify() {
     esac
 }
 
+# notify <urgency> <icon> <title> [body]
+# The stack tag makes each notification replace the previous one, so
+# "Checking..." is swapped for the result instead of piling up.
 notify() {
     local urgency=$1 icon=$2 title=$3 body=${4:-}
     if command -v dunstify >/dev/null 2>&1; then
@@ -52,20 +56,28 @@ notify() {
     fi
 }
 
+# print_block <colour> <full_text> [short_text]
 print_block() {
     local colour=$1 full=$2 short=${3:-$2}
     printf "%s<span color='%s'>%s</span>\n" "$LABEL" "$colour" "$full"
     printf "%s<span color='%s'>%s</span>\n" "$LABEL" "$colour" "$short"
 }
 
+# Instant feedback on click: the check can take a few seconds (db sync).
 if [[ -n "${BLOCK_BUTTON:-}" ]] && want_notify; then
     notify low software-update-available-symbolic "Checking for updates…"
 fi
 
+# Serialise runs: a click while the hourly check is running must not start
+# a second checkupdates in parallel.
 exec 9>"${XDG_RUNTIME_DIR:-/tmp}/arch_update.lock"
 flock -w "$CHECK_TIMEOUT" 9 || exit 0
 
+# ── Fetch updates ────────────────────────────────────────────────────
+
 error=0
+# checkupdates exit codes: 0 = updates found, 2 = none, anything else = error
+# (offline, database locked, timeout -> 124, not installed -> 127).
 lines=$(timeout "$CHECK_TIMEOUT" checkupdates 2>/dev/null)
 case $? in
     0) ;;
@@ -76,10 +88,14 @@ esac
 if (( ! error )) && is_true "$AUR"; then
     helper=$(command -v yay || command -v paru || true)
     if [[ -n "$helper" ]]; then
+        # Exits 1 with empty output when there is nothing to update:
+        # that is not an error. AUR is best-effort, never fails the block.
         aur=$(timeout "$CHECK_TIMEOUT" "$helper" -Qua 2>/dev/null) || true
         [[ -n "$aur" ]] && lines+="${lines:+$'\n'}$aur"
     fi
 fi
+
+# ── Error ────────────────────────────────────────────────────────────
 
 if (( error )); then
     print_block "$ERROR_COLOR" "?"
@@ -89,6 +105,8 @@ if (( error )); then
     exit 0
 fi
 
+# ── Up to date ───────────────────────────────────────────────────────
+
 count=$(grep -c . <<<"$lines")
 if (( count == 0 )); then
     is_true "$QUIET" || print_block "$BASE_COLOR" "0"
@@ -96,9 +114,12 @@ if (( count == 0 )); then
     exit 0
 fi
 
+# ── Updates available ────────────────────────────────────────────────
+
+# Packages matching a WATCH regex get highlighted in the bar.
 matches=""
 if [[ -n "$WATCH" ]]; then
-    read -ra watch_list <<<"$WATCH"  
+    read -ra watch_list <<<"$WATCH"   # no word-splitting + globbing surprises
     names=$(awk '{print $1}' <<<"$lines")
     for pattern in "${watch_list[@]}"; do
         matches+="$(grep -E -- "^($pattern)" <<<"$names")"$'\n'

@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 
-# myi3 di manuel - v1.0
-
 set -uo pipefail
+
+# ============================================================
+# CONFIGURATION
+# ============================================================
 
 ROFI="rofi"
 THEME="$HOME/.config/rofi/menu.rasi"
@@ -11,12 +13,23 @@ TERMINAL="alacritty"
 CONFIG_MENU="$HOME/.config/i3/scripts/config-menu"
 POWER_PROFILE="$HOME/.config/i3/scripts/power-profile"
 
+# Audio mixer
 AUDIO_MIXER="pulsemixer"
 
+# Keybindings text file
 KEYBINDINGS_FILE="$HOME/.config/i3/shortcuts.md"
 KEYBINDINGS_PAGER="less"
 
+# Optional notification command.
+# Leave empty for automatic detection.
 NOTIFICATION_CMD=""
+
+# ------------------------------------------------------------
+# MENU ENTRIES
+#
+# Add/edit names and icons here.
+# Keep the same order as ENTRY_IDS.
+# ------------------------------------------------------------
 
 ENTRY_IDS=(
     "config"
@@ -51,6 +64,10 @@ ENTRY_ICONS=(
     "󰦖 "
 )
 
+# ============================================================
+# FUNCTIONS
+# ============================================================
+
 notify() {
     local title="$1"
     local message="$2"
@@ -73,6 +90,10 @@ notify() {
     fi
 }
 
+# ------------------------------------------------------------
+# VALIDATE MENU
+# ------------------------------------------------------------
+
 check_entries() {
     local count="${#ENTRY_IDS[@]}"
 
@@ -84,6 +105,11 @@ check_entries() {
         return 1
     fi
 }
+
+# ------------------------------------------------------------
+# SHOW ROFI MENU
+# Returns selected index in SELECTED_INDEX.
+# ------------------------------------------------------------
 
 up_time=$(uptime -p | sed 's/^up //')
 message=$(printf '   %s (%s)' "$USER" "$up_time")
@@ -118,6 +144,10 @@ show_menu() {
     return 0
 }
 
+# ------------------------------------------------------------
+# CHECK TERMINAL
+# ------------------------------------------------------------
+
 check_terminal() {
     if ! command -v "$TERMINAL" >/dev/null 2>&1; then
         notify "Quick Launcher" "Terminal not found: $TERMINAL"
@@ -125,11 +155,19 @@ check_terminal() {
     fi
 }
 
+# ------------------------------------------------------------
+# LAUNCH IN NEW TERMINAL
+# ------------------------------------------------------------
+
 launch_terminal() {
     check_terminal || return 1
 
     nohup "$TERMINAL" -e "$@" >/dev/null 2>&1 &
 }
+
+# ------------------------------------------------------------
+# LAUNCH IN TERMINAL AND KEEP OPEN
+# ------------------------------------------------------------
 
 launch_hold() {
     check_terminal || return 1
@@ -147,11 +185,19 @@ launch_hold() {
     ' quick-launcher "$@" >/dev/null 2>&1 &
 }
 
+# ============================================================
+# LAUNCH ACTIONS
+# ============================================================
+
 launch_entry() {
     local index="$1"
     local id="${ENTRY_IDS[index]}"
 
     case "$id" in
+
+        # ----------------------------------------------------
+        # CONFIG MENU
+        # ----------------------------------------------------
 
         config)
             if [[ ! -x "$CONFIG_MENU" ]]; then
@@ -163,6 +209,10 @@ launch_entry() {
             nohup "$CONFIG_MENU" >/dev/null 2>&1 &
             ;;
             
+        # ----------------------------------------------------
+        # POWER PROFILE
+        # ----------------------------------------------------
+
         powerprofile)
             if [[ ! -x "$POWER_PROFILE" ]]; then
                 notify "Quick Launcher" \
@@ -173,30 +223,54 @@ launch_entry() {
             nohup "$POWER_PROFILE" >/dev/null 2>&1 &
             ;;
 
+        # ----------------------------------------------------
+        # PACSEEK
+        # ----------------------------------------------------
+
         pacseek)
             check_command "pacseek" "Pacseek" || return 1
             launch_terminal pacseek
             ;;
+
+        # ----------------------------------------------------
+        # HTOP
+        # ----------------------------------------------------
 
         htop)
             check_command "htop" "Htop" || return 1
             launch_terminal htop
             ;;
 
+        # ----------------------------------------------------
+        # FASTFETCH
+        # ----------------------------------------------------
+
         fastfetch)
             check_command "fastfetch" "Fastfetch" || return 1
             launch_hold fastfetch
             ;;
+
+        # ----------------------------------------------------
+        # SYSTEM LOGS
+        # ----------------------------------------------------
 
         logs)
             check_command "journalctl" "System Logs" || return 1
             launch_hold journalctl -f
             ;;
 
+        # ----------------------------------------------------
+        # AUDIO MIXER
+        # ----------------------------------------------------
+
         audio)
             check_command "$AUDIO_MIXER" "Audio Mixer" || return 1
             launch_terminal "$AUDIO_MIXER"
             ;;
+
+        # ----------------------------------------------------
+        # KEYBINDINGS
+        # ----------------------------------------------------
 
         keybindings)
             if [[ ! -f "$KEYBINDINGS_FILE" ]]; then
@@ -218,6 +292,10 @@ launch_entry() {
     esac
 }
 
+# ------------------------------------------------------------
+# CHECK COMMAND
+# ------------------------------------------------------------
+
 check_command() {
     local command="$1"
     local name="$2"
@@ -227,6 +305,10 @@ check_command() {
         return 1
     fi
 }
+
+# ============================================================
+# MAIN
+# ============================================================
 
 if ! command -v "$ROFI" >/dev/null 2>&1; then
     notify "Quick Launcher" "Rofi not found: $ROFI"

@@ -1,7 +1,4 @@
 #!/usr/bin/env bash
-
-# myi3 di manuel - v1.0
-
 set -u
 
 case "${BLOCK_BUTTON:-}" in

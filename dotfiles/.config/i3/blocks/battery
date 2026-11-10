@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
-
-# myi3 di manuel - v1.0
+# battery — i3blocks block showing battery level, state and time left.
+#
+# Reads the kernel's sysfs interface directly (no `acpi`, no subprocess on the
+# normal path). Prints the usual three i3blocks lines (full text, short text,
+# colour) and exits 33 ("urgent") when discharging below URGENT_LEVEL.
+# Prints nothing when the machine has no battery.
 #
 # Click (left): opens the Rofi power-profile selector with current battery info.
+#
+# Low-battery alerts are NOT sent from here: batsignal already does that
+# (warning / critical / full / charger plugged), and a second source would
+# only duplicate its notifications.
 #
 # Configuration (environment variables, set them in i3blocks.conf):
 #   BAT_NUMBER      which battery, 0-based, like `acpi` numbered them  (0)
@@ -18,7 +26,7 @@
 
 set -u
 
-SYSFS="${SYSFS:-/sys}" 
+SYSFS="${SYSFS:-/sys}"   # overridable only to test against a fake tree
 PSDIR="$SYSFS/class/power_supply"
 
 BAT_NUMBER="${BAT_NUMBER:-0}"
@@ -32,24 +40,32 @@ CRIT_LEVEL="${CRIT_LEVEL:-20}"
 URGENT_LEVEL="${URGENT_LEVEL:-5}"
 NA_COLOR="#9AA0A6"
 
-_d=$'\xf3\xb0\x81\xb9'   
-_c=$'\xf3\xb0\x82\x84'   
-_p=$'\xf3\xb0\x82\x85'   
+# Nerd Font glyphs as UTF-8 byte escapes, so they survive any locale.
+_d=$'\xf3\xb0\x81\xb9'   # U+F0079 nf-md-battery
+_c=$'\xf3\xb0\x82\x84'   # U+F0084 nf-md-battery_charging
+_p=$'\xf3\xb0\x82\x85'   # U+F0085 nf-md-battery_charging_100
 ICON_DISCHARGING="${ICON_DISCHARGING-$_d}"
 ICON_CHARGING="${ICON_CHARGING-$_c}"
 ICON_PLUGGED="${ICON_PLUGGED-$_p}"
 
+# Fall back to the defaults on anything that is not a plain integer.
 [[ $BAT_NUMBER   =~ ^[0-9]+$ ]] || BAT_NUMBER=0
 [[ $WARN_LEVEL   =~ ^[0-9]+$ ]] || WARN_LEVEL=30
 [[ $CRIT_LEVEL   =~ ^[0-9]+$ ]] || CRIT_LEVEL=20
 [[ $URGENT_LEVEL =~ ^[0-9]+$ ]] || URGENT_LEVEL=5
 
+# rd <file> <varname>: read the first line of a sysfs file into a variable
+# (empty when unreadable). Builtins only, no fork.
 rd() {
     local -n _out=$2
     _out=""
     [[ -r $1 ]] && { read -r _out < "$1"; } 2>/dev/null
     return 0
 }
+
+# ── Find the battery ─────────────────────────────────────────────────
+# Counts only system batteries, like `acpi` did: wireless mice and keyboards
+# also show up as power supplies (scope=Device) and must not take index 0.
 
 BAT=""
 
@@ -71,6 +87,7 @@ find_battery() {
     return 1
 }
 
+# True when some mains/USB-C supply reports online=1.
 ac_online() {
     local dir on
     for dir in "$PSDIR"/*; do
@@ -80,11 +97,14 @@ ac_online() {
     return 1
 }
 
-find_battery || exit 0     
+find_battery || exit 0     # no battery: print nothing, like before
+
+# ── Read it ──────────────────────────────────────────────────────────
 
 rd "$BAT/status" status
 [[ -n $status ]] || status=Unknown
 
+# Amounts are in µWh (energy_*) or µAh (charge_*); rate in µW or µA.
 rd "$BAT/energy_now" now
 if [[ $now =~ ^[0-9]+$ ]]; then unit=energy; else rd "$BAT/charge_now" now; unit=charge; fi
 rd "$BAT/${unit}_full" full
@@ -92,6 +112,7 @@ rd "$BAT/${unit}_full_design" design
 
 rd "$BAT/capacity" cap
 if ! [[ $cap =~ ^[0-9]+$ ]]; then
+    # No capacity file: derive it from the amounts.
     if [[ $now =~ ^[0-9]+$ && $full =~ ^[0-9]+$ ]] && (( full > 0 )); then
         cap=$(( now * 100 / full ))
     else
@@ -101,6 +122,8 @@ if ! [[ $cap =~ ^[0-9]+$ ]]; then
 fi
 (( cap > 100 )) && cap=100
 
+# Discharge/charge rate: power_uw is what we show, rate is what time is
+# computed from (same unit as `now`).
 rate=0 power_uw=0
 if [[ $unit == energy ]]; then
     rd "$BAT/power_now" rate
@@ -126,11 +149,13 @@ fi
 (( secs > 0 && secs < 360000 )) \
     && printf -v eta '%02d:%02d' "$(( secs / 3600 ))" "$(( (secs % 3600) / 60 ))"
 
+# ── Icon, colour, text ───────────────────────────────────────────────
+
 case $status in
     Discharging)          icon=$ICON_DISCHARGING ;;
     Charging)             icon=$ICON_CHARGING ;;
     Full|"Not charging")  icon=$ICON_PLUGGED ;;
-    *)  
+    *)  # Unknown: ask the AC adapter
         if ac_online; then icon=$ICON_PLUGGED; else icon=$ICON_DISCHARGING; fi ;;
 esac
 
@@ -147,6 +172,8 @@ full_text=$short
 [[ -n $eta ]] && full_text+=" ($eta)"
 printf '%s\n%s\n%s\n' "$full_text" "$short" "$color"
 
+# ── Click: open the power-profile menu ────────────────────────────────
+
 if [[ ${BLOCK_BUTTON:-} == 1 ]]; then
     POWER_PROFILE_SCRIPT="${HOME}/.config/i3/scripts/power-profile"
 
@@ -157,5 +184,6 @@ if [[ ${BLOCK_BUTTON:-} == 1 ]]; then
         "$POWER_PROFILE_SCRIPT" >/dev/null 2>&1 &
 fi
 
+# Exit code 33 makes i3blocks flag the block as urgent.
 (( urgent )) && exit 33
 exit 0

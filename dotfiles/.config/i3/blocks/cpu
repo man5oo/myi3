@@ -1,6 +1,5 @@
 #!/bin/bash
-
-# myi3 di manuel - v1.0
+# Source: http://askubuntu.com/a/450136
 
 URGENT_VALUE=90
 
@@ -15,10 +14,11 @@ if [[ -f "${cpuFile}" ]]; then
   PREV_IDLE=$(echo "${fileCont}" | tail -n 1)
 fi
 
-CPU=(`cat /proc/stat | grep '^cpu '`) 
-unset CPU[0]                          
-IDLE=${CPU[4]}                        
+CPU=(`cat /proc/stat | grep '^cpu '`) # Get the total CPU statistics.
+unset CPU[0]                          # Discard the "cpu" prefix.
+IDLE=${CPU[4]}                        # Get the idle CPU time.
 
+# Calculate the total CPU time.
 TOTAL=0
 
 for VALUE in "${CPU[@]:0:4}"; do
@@ -26,6 +26,7 @@ for VALUE in "${CPU[@]:0:4}"; do
 done
 
 if [[ "${PREV_TOTAL}" != "" ]] && [[ "${PREV_IDLE}" != "" ]]; then
+  # Calculate the CPU usage since we last checked.
   let "DIFF_IDLE=$IDLE-$PREV_IDLE"
   let "DIFF_TOTAL=$TOTAL-$PREV_TOTAL"
   let "DIFF_USAGE=(1000*($DIFF_TOTAL-$DIFF_IDLE)/$DIFF_TOTAL+5)/10"
@@ -38,6 +39,7 @@ else
   echo ""
 fi
 
+# Remember the total and idle CPU times for the next check.
 echo "${TOTAL}" > "${cpuFile}"
 echo "${IDLE}" >> "${cpuFile}"
 

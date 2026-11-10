@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+
+# myi3 di manuel - v1.0
+
+set -u
+
+DISPLAY_NAME="eDP-1"
+TOUCHSCREEN_NAME="ELAN Touchscreen"
+THEME="$HOME/.config/rofi/orientation-menu.rasi"
+SET_WALLPAPER="$HOME/.config/i3/scripts/set-wallpaper"
+
+# "label|xrandr rotation|touchscreen matrix"
+entries=(
+    "↑  Normal|normal|1 0 0 0 1 0 0 0 1"
+    "←  Left|left|0 -1 1 1 0 0 0 0 1"
+    "→  Right|right|0 1 0 -1 0 1 0 0 1"
+    "↓  Inverted|inverted|-1 0 1 0 -1 1 0 0 1"
+)
+
+notify() {
+    if command -v dunstify >/dev/null 2>&1; then
+        dunstify -a orientation "$1" "${2:-}"
+    elif command -v notify-send >/dev/null 2>&1; then
+        notify-send -a orientation "$1" "${2:-}"
+    fi
+}
+
+for cmd in rofi xrandr xinput; do
+    command -v "$cmd" >/dev/null 2>&1 || {
+        notify "Orientation" "Missing dependency: $cmd"
+        exit 1
+    }
+done
+
+# Current rotation, parsed from `xrandr --query`
+current=$(xrandr --query | awk -v out="$DISPLAY_NAME" '
+    $1 == out {
+        for (i = 3; i <= NF; i++)
+            if ($i ~ /^[0-9]+x[0-9]+\+[0-9]+\+[0-9]+$/) {
+                r = $(i + 1)
+                if (r != "left" && r != "right" && r != "inverted") r = "normal"
+                print r
+                exit
+            }
+    }')
+current=${current:-unknown}
+
+labels=""
+for entry in "${entries[@]}"; do
+    labels+="${entry%%|*}"$'\n'
+done
+
+index=$(printf '%s' "$labels" | rofi -dmenu -i -no-custom -format i \
+    -p "Orientation" \
+    -mesg "Current: $current" \
+    -theme "$THEME" \
+    -theme-str 'listview { lines: 4; }') || exit 0
+
+[[ "$index" =~ ^[0-9]+$ ]] && (( index < ${#entries[@]} )) || exit 0
+
+IFS='|' read -r label rotation matrix <<< "${entries[index]}"
+
+xrandr --output "$DISPLAY_NAME" --rotate "$rotation" || {
+    notify "Orientation" "Display rotation failed"
+    exit 1
+}
+
+# Touchscreen mapping (works even if the device is currently disabled)
+if id=$(xinput list --id-only "$TOUCHSCREEN_NAME" 2>/dev/null); then
+    # $matrix is intentionally unquoted: xinput wants 9 separate arguments
+    xinput set-prop "$id" "Coordinate Transformation Matrix" $matrix ||
+        notify "Orientation" "Touchscreen mapping failed"
+fi
+
+# The root window changed size: redraw the wallpaper
+[[ -x "$SET_WALLPAPER" ]] && "$SET_WALLPAPER" >/dev/null 2>&1
+
+notify "Orientation" "${label#*  }"
